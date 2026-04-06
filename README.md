@@ -89,10 +89,22 @@ Start the Bun API:
 bun run api
 ```
 
+or use the root alias:
+
+```bash
+bun run dev
+```
+
 Start the Next.js dashboard:
 
 ```bash
 bun run web:dev
+```
+
+or use the root alias:
+
+```bash
+bun run dev:web
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
