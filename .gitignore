@@ -15,3 +15,6 @@ firebase-debug.log
 .firebase/
 *.log
 .DS_Store
+web/.next/
+web/.env.local
+web/node_modules/
