@@ -6,6 +6,7 @@ This repo now has two runtime surfaces:
 
 - A Bun API and worker that accepts uploaded video files, queues jobs, and runs the heavy pipeline on EC2.
 - A separate Next.js dashboard in [`web/`](/Users/abhijeetpranavmishra/Downloads/viral-clips-generator/web) for uploads, queue visibility, and clip review.
+- An optional local-only YouTube bridge inside the Next.js dashboard that runs `yt-dlp` on your laptop and forwards the finished file to the EC2 API.
 
 ## Architecture
 
@@ -26,6 +27,15 @@ The YouTube download step is now optional. For EC2, the intended flow is:
 1. Download the source video on your own machine with your own cookies/tooling.
 2. Upload the finished video file through the dashboard.
 3. Let EC2 handle transcription, silence cleanup, clip extraction, captions, and final reel rendering.
+
+If you want one-button downloading from your laptop, run the Next dashboard locally with:
+
+```bash
+NEXT_PUBLIC_LOCAL_YTDLP_ENABLED=true
+LOCAL_YTDLP_ENABLED=true
+```
+
+and make sure `yt-dlp` is installed on that laptop. The dashboard will then expose a "Download Here, Run On EC2" action that downloads the YouTube file locally and uploads it to the EC2 Bun API.
 
 ## Why This Fits A 4 GB EC2 Box
 
@@ -62,6 +72,13 @@ Copy the example env files and adjust for your EC2 instance:
 ```bash
 cp .env.example .env
 cp web/.env.example web/.env.local
+```
+
+For laptop bridge mode, point `NEXT_PUBLIC_API_BASE_URL` in [`web/.env.local`](/Users/abhijeetpranavmishra/Downloads/viral-clips-generator/web/.env.local) to your EC2 API host and set:
+
+```bash
+NEXT_PUBLIC_LOCAL_YTDLP_ENABLED=true
+LOCAL_YTDLP_ENABLED=true
 ```
 
 ## Run Locally
