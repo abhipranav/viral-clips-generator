@@ -154,6 +154,7 @@ input {
 }
 
 .panel-head h2,
+.section-header h3,
 .detail-block h3 {
   margin: 6px 0 0;
 }
@@ -166,6 +167,11 @@ input {
   background: rgba(255, 143, 60, 0.14);
   color: var(--accent-soft);
   font-size: 0.85rem;
+}
+
+.pill-muted {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-dim);
 }
 
 .field,
@@ -182,13 +188,19 @@ input {
 
 .field input[type="file"],
 .field input[type="text"],
-.field input[type="number"] {
+.field input[type="number"],
+.field input[type="url"],
+.select-input {
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 14px;
   background: rgba(4, 11, 17, 0.65);
   color: var(--text);
   padding: 14px 16px;
+}
+
+.select-input {
+  appearance: none;
 }
 
 .field-row {
@@ -233,6 +245,29 @@ input {
 .message {
   margin: 12px 0 0;
   color: var(--accent-soft);
+}
+
+.source-section {
+  display: grid;
+  gap: 12px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.panel-divider {
+  height: 1px;
+  margin: 24px 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0.18),
+    rgba(255, 255, 255, 0)
+  );
 }
 
 .run-list,
