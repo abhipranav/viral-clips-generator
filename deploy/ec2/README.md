@@ -69,6 +69,7 @@ Web env:
 
 - set `NEXT_PUBLIC_API_BASE_URL` to your public API origin if you serve API separately
 - if nginx fronts both services on one host, `/api` requests can still point to the same host
+- keep `NEXT_PUBLIC_LOCAL_YTDLP_ENABLED=false` and `LOCAL_YTDLP_ENABLED=false` on EC2
 
 ## 5. Enable systemd Services
 
@@ -94,5 +95,6 @@ sudo systemctl reload nginx
 - Uploaded videos land in `data/uploads/`
 - Rendered clips land in `output/<video-id>/`
 - Run state is stored in `data/checkpoints.db`
+- The local yt-dlp bridge is meant for your laptop, not the EC2 box
 - If memory pressure becomes a problem, reduce `MAX_CLIPS` and keep captions disabled
 - If disk pressure becomes a problem, periodically run the clean command for old runs
