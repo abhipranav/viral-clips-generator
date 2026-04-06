@@ -1,4 +1,10 @@
-import type { CreateRunResponse, DashboardResponse, RunDetailResponse } from "./types";
+import type {
+  CreateRunResponse,
+  DashboardResponse,
+  LocalDownloadRequest,
+  LocalDownloadResponse,
+  RunDetailResponse,
+} from "./types";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:3001";
 
@@ -31,6 +37,19 @@ export async function createRun(formData: FormData): Promise<CreateRunResponse> 
     body: formData,
   });
   return await parseJson<CreateRunResponse>(response);
+}
+
+export async function createRunFromYouTube(
+  payload: LocalDownloadRequest,
+): Promise<LocalDownloadResponse> {
+  const response = await fetch("/api/local-download", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  return await parseJson<LocalDownloadResponse>(response);
 }
 
 export function resolveMediaUrl(path: string): string {

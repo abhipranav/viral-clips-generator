@@ -61,3 +61,18 @@ export interface CreateRunResponse {
   runId: string;
   queue: QueueStats;
 }
+
+export interface LocalDownloadRequest {
+  youtubeUrl: string;
+  title?: string;
+  maxClips?: string;
+  generateCaptions?: boolean;
+  removeSilence?: boolean;
+  cookiesBrowser?: string;
+  keepLocalCopy?: boolean;
+}
+
+export interface LocalDownloadResponse extends CreateRunResponse {
+  localFileName: string;
+  localFilePath?: string;
+}
