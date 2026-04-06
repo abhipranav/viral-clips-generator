@@ -7,7 +7,7 @@ import { ClipIdentifier } from "../modules/clip-identifier";
 import { InputResolver } from "../modules/input-resolver";
 import { Transcriber } from "../modules/transcriber";
 import { VideoProcessor } from "../modules/video-processor";
-import { ensureDir, runDir, slugify } from "../utils/fs";
+import { buildClipOutputFileName, ensureDir, runDir, slugify } from "../utils/fs";
 import { createLogger } from "../utils/logger";
 import { CheckpointManager } from "./checkpoint";
 import { PipelineStage, type PipelineInput, type ClipArtifacts, type ClipCandidate, type Transcript, type VideoMetadata } from "./types";
@@ -450,7 +450,7 @@ export class PipelineOrchestrator {
           captionOverlayPath: artifacts.captionOverlayPath,
         },
       );
-      const reelPath = join(outputDir, `${clip.id}_reel.mp4`);
+      const reelPath = join(outputDir, buildClipOutputFileName(clip.title, clip.id, clipIndex));
       artifacts.finalReelPath = await this.videoProcessor.composeReel(
         artifacts.silenceRemovedPath,
         config,

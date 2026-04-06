@@ -63,3 +63,14 @@ export function slugify(value: string, fallback = "video"): string {
 
   return normalized || fallback;
 }
+
+export function buildClipOutputFileName(
+  clipTitle: string,
+  clipId: string,
+  clipIndex: number,
+): string {
+  const order = String(clipIndex + 1).padStart(2, "0");
+  const titleSlug = slugify(clipTitle, "clip").slice(0, 60);
+  const uniqueSuffix = clipId.slice(0, 8) || "clip";
+  return `${order}-${titleSlug}-${uniqueSuffix}.mp4`;
+}

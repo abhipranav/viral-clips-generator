@@ -8,6 +8,7 @@ import {
   listFiles,
   randomItem,
   cleanRunArtifacts,
+  buildClipOutputFileName,
   sanitizeFileName,
   slugify,
 } from "../../src/utils/fs";
@@ -122,5 +123,17 @@ describe("sanitizeFileName", () => {
 describe("slugify", () => {
   test("returns a fallback for empty values", () => {
     expect(slugify("   ", "fallback")).toBe("fallback");
+  });
+});
+
+describe("buildClipOutputFileName", () => {
+  test("includes order, title slug, and stable unique suffix", () => {
+    expect(buildClipOutputFileName("The End of Permanent Allies and Enemies", "421f5f78-d8a8", 2)).toBe(
+      "03-the-end-of-permanent-allies-and-enemies-421f5f78.mp4",
+    );
+  });
+
+  test("falls back safely when title is empty", () => {
+    expect(buildClipOutputFileName("", "abc12345-ffff", 0)).toBe("01-clip-abc12345.mp4");
   });
 });

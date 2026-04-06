@@ -286,6 +286,19 @@ export class CheckpointManager {
     }));
   }
 
+  updateClipArtifactPaths(
+    runId: string,
+    clipId: string,
+    artifactPaths: Record<string, string>,
+  ): void {
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        `UPDATE clip_progress SET artifact_paths = ?, updated_at = ? WHERE id = ? AND run_id = ?`,
+      )
+      .run(JSON.stringify(artifactPaths), now, clipId, runId);
+  }
+
   markRunComplete(runId: string): void {
     const now = new Date().toISOString();
     this.db
