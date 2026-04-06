@@ -297,6 +297,10 @@ export class PipelineOrchestrator {
 
     const succeeded = results.filter((result) => result.status === "fulfilled").length;
     log.info(`${succeeded}/${clips.length} clips processed successfully`);
+
+    if (failed.length > 0) {
+      throw new Error(`Clip processing incomplete: ${failed.length}/${clips.length} clips failed`);
+    }
   }
 
   private async processOneClip(

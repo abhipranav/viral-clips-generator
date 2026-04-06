@@ -1,5 +1,22 @@
 import { z } from "zod";
 
+function parseBooleanEnv(value: string | undefined): boolean | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+
+  return undefined;
+}
+
 const configSchema = z.object({
   geminiApiKey: z.string().default(""),
   whisperModel: z.enum(["tiny", "base", "small", "medium", "large"]).default("tiny"),
@@ -10,10 +27,12 @@ const configSchema = z.object({
   outputHeight: z.coerce.number().default(1920),
   clipSpeed: z.coerce.number().min(1).max(2).default(1.2),
   maxClips: z.coerce.number().int().min(0).default(5),
-  preferYouTubeTranscripts: z.coerce.boolean().default(false),
-  captionAnimate: z.coerce.boolean().default(true),
-  generateCaptions: z.coerce.boolean().default(false),
-  removeSilence: z.coerce.boolean().default(true),
+  preferYouTubeTranscripts: z.boolean().default(false),
+  captionAnimate: z.boolean().default(true),
+  generateCaptions: z.boolean().default(false),
+  removeSilence: z.boolean().default(true),
+  whisperCliBin: z.string().default("whisper-cli"),
+  whisperCliModelPath: z.string().default(""),
   serverHost: z.string().default("0.0.0.0"),
   serverPort: z.coerce.number().int().min(1).max(65535).default(3001),
   jobConcurrency: z.coerce.number().int().min(1).max(4).default(1),
@@ -43,10 +62,12 @@ export function loadConfig(options?: { requireGeminiApiKey?: boolean }): Config 
     outputHeight: Bun.env.OUTPUT_HEIGHT,
     clipSpeed: Bun.env.CLIP_SPEED,
     maxClips: Bun.env.MAX_CLIPS,
-    preferYouTubeTranscripts: Bun.env.PREFER_YOUTUBE_TRANSCRIPTS,
-    captionAnimate: Bun.env.CAPTION_ANIMATE,
-    generateCaptions: Bun.env.GENERATE_CAPTIONS,
-    removeSilence: Bun.env.REMOVE_SILENCE,
+    preferYouTubeTranscripts: parseBooleanEnv(Bun.env.PREFER_YOUTUBE_TRANSCRIPTS),
+    captionAnimate: parseBooleanEnv(Bun.env.CAPTION_ANIMATE),
+    generateCaptions: parseBooleanEnv(Bun.env.GENERATE_CAPTIONS),
+    removeSilence: parseBooleanEnv(Bun.env.REMOVE_SILENCE),
+    whisperCliBin: Bun.env.WHISPER_CLI_BIN,
+    whisperCliModelPath: Bun.env.WHISPER_CLI_MODEL_PATH,
     serverHost: Bun.env.SERVER_HOST,
     serverPort: Bun.env.SERVER_PORT,
     jobConcurrency: Bun.env.JOB_CONCURRENCY,

@@ -18,6 +18,35 @@ const defaultQueue: QueueStats = {
   concurrency: 1,
 };
 const localDownloaderEnabled = process.env.NEXT_PUBLIC_LOCAL_YTDLP_ENABLED === "true";
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:3001";
+
+function getWorkerMode(baseUrl: string): {
+  label: string;
+  shortLabel: string;
+  description: string;
+} {
+  const normalized = baseUrl.toLowerCase();
+  const isLocal =
+    normalized.includes("127.0.0.1") ||
+    normalized.includes("localhost") ||
+    normalized.includes("0.0.0.0");
+
+  if (isLocal) {
+    return {
+      label: "Local Worker",
+      shortLabel: "Local",
+      description:
+        "This dashboard is currently targeting a worker on this machine. Uploads and processing stay local unless you point the API at EC2.",
+    };
+  }
+
+  return {
+    label: "Remote Worker",
+    shortLabel: "Remote",
+    description:
+      "This dashboard is currently targeting a remote worker, such as your EC2 box. Your laptop can still do local yt-dlp downloads and forward the finished file upstream.",
+  };
+}
 
 function formatTimestamp(value: string): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -35,6 +64,7 @@ function statusLabel(run: RunRecord): string {
 }
 
 export default function HomePage() {
+  const workerMode = getWorkerMode(apiBaseUrl);
   const [queue, setQueue] = useState<QueueStats>(defaultQueue);
   const [runs, setRuns] = useState<RunRecord[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
@@ -208,17 +238,20 @@ export default function HomePage() {
     <main className="shell">
       <section className="hero">
         <div className="hero-copy">
-          <p className="eyebrow">EC2 Control Room</p>
-          <h1>Upload once, let the cloud take the heat.</h1>
+          <p className="eyebrow">{workerMode.label}</p>
+          <h1>
+            {workerMode.shortLabel === "Local"
+              ? "Run the worker here, or point it somewhere bigger."
+              : "Use your laptop as the bridge and let the remote worker take the heat."}
+          </h1>
           <p className="hero-text">
-            This dashboard is built for the flow you described: you download YouTube videos on your
-            own device, ship the file to EC2, and let the server handle transcription, silence
-            cleanup, clip extraction, and final reel rendering.
+            {workerMode.description}
           </p>
+          <p className="supporting-copy">Active API target: {apiBaseUrl}</p>
         </div>
 
         <div className="queue-card">
-          <span className="queue-label">Queue</span>
+          <span className="queue-label">{workerMode.shortLabel} Queue</span>
           <strong>{queue.running}</strong>
           <p>running now</p>
           <div className="queue-grid">
@@ -239,7 +272,9 @@ export default function HomePage() {
           <div className="panel-head">
             <div>
               <p className="eyebrow">New Run</p>
-              <h2>Pick your input source</h2>
+              <h2>
+                Pick your input source for the {workerMode.shortLabel.toLowerCase()} worker
+              </h2>
             </div>
             <span className="pill">{generateCaptions ? "Caption Mode" : "Fast Mode"}</span>
           </div>
@@ -289,7 +324,10 @@ export default function HomePage() {
             <div className="section-header">
               <div>
                 <p className="eyebrow">Laptop Bridge</p>
-                <h3>Download with local yt-dlp, then forward to EC2</h3>
+                <h3>
+                  Download with local yt-dlp, then forward to the{" "}
+                  {workerMode.shortLabel.toLowerCase()} worker
+                </h3>
               </div>
               <span className={`pill ${localDownloaderEnabled ? "" : "pill-muted"}`}>
                 {localDownloaderEnabled ? "Enabled Here" : "Disabled Here"}
@@ -345,7 +383,7 @@ export default function HomePage() {
 
             <p className="supporting-copy">
               Run the Next app on your Mac with `LOCAL_YTDLP_ENABLED=true` and `yt-dlp`
-              installed. This route never downloads on EC2.
+              installed. This route downloads on your laptop, then uploads to {apiBaseUrl}.
             </p>
 
             {localMessage ? <p className="message">{localMessage}</p> : null}
@@ -357,7 +395,10 @@ export default function HomePage() {
             <div className="section-header">
               <div>
                 <p className="eyebrow">Manual Upload</p>
-                <h3>Pick a finished video file yourself</h3>
+                <h3>
+                  Pick a finished video file and send it to the{" "}
+                  {workerMode.shortLabel.toLowerCase()} worker
+                </h3>
               </div>
             </div>
 
@@ -379,8 +420,8 @@ export default function HomePage() {
           </form>
 
           <p className="supporting-copy">
-            Default profile is tuned for a 4 GB EC2 instance: one worker, smaller Whisper model,
-            captions off by default, and only a handful of clips per job.
+            Default profile is tuned conservatively for a 4 GB box: one worker, smaller Whisper
+            model, captions off by default, and only a handful of clips per job.
           </p>
 
           {message ? <p className="message">{message}</p> : null}

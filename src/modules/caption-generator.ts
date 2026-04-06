@@ -3,6 +3,7 @@ import { getVideoDuration, runFfmpeg } from "../utils/ffmpeg";
 import { ensureDir } from "../utils/fs";
 import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition } from "@remotion/renderer";
+import { existsSync } from "fs";
 import { dirname, resolve, join } from "path";
 import type { Config } from "../config";
 import type { CaptionWord, CaptionGroup, CaptionOverlayProps } from "../remotion/types";
@@ -10,7 +11,6 @@ import type { CaptionWord, CaptionGroup, CaptionOverlayProps } from "../remotion
 const log = createLogger("captions");
 const FPS = 30;
 const WORDS_PER_GROUP = 6;
-const WHISPER_CLI = "whisper-cli";
 const MODELS_DIR = resolve(__dirname, "../../models");
 
 let bundlePromise: Promise<string> | null = null;
@@ -19,6 +19,17 @@ interface WhisperWord {
   word: string;
   start: number;
   end: number;
+}
+
+interface PythonWhisperSegment {
+  text: string;
+  start: number;
+  end: number;
+  words?: Array<{
+    word?: string;
+    start?: number;
+    end?: number;
+  }>;
 }
 
 export class CaptionGenerator {
@@ -111,7 +122,28 @@ export class CaptionGenerator {
     config: Config,
     workDir: string,
   ): Promise<WhisperWord[]> {
-    const modelPath = join(MODELS_DIR, `ggml-${config.whisperModel}.bin`);
+    try {
+      return await this.fromWhisperCli(videoPath, config, workDir);
+    } catch (err) {
+      log.warn(`whisper-cli unavailable for captions: ${err}. Falling back to Python Whisper.`);
+      return await this.fromPythonWhisper(videoPath, config);
+    }
+  }
+
+  private async fromWhisperCli(
+    videoPath: string,
+    config: Config,
+    workDir: string,
+  ): Promise<WhisperWord[]> {
+    const modelPath =
+      config.whisperCliModelPath || join(MODELS_DIR, `ggml-${config.whisperModel}.bin`);
+
+    if (!existsSync(modelPath)) {
+      throw new Error(
+        `Whisper CLI model file not found at ${modelPath}. Set WHISPER_CLI_MODEL_PATH or download the ggml model locally.`,
+      );
+    }
+
     log.info(`Running whisper-cli word-level transcription (model: ${config.whisperModel})...`);
 
     const wavPath = join(workDir, "caption_audio.wav");
@@ -120,7 +152,7 @@ export class CaptionGenerator {
     const jsonBase = join(workDir, "caption_words");
     const proc = Bun.spawn(
       [
-        WHISPER_CLI,
+        config.whisperCliBin,
         "-m",
         modelPath,
         "-f",
@@ -164,6 +196,127 @@ export class CaptionGenerator {
     }
 
     return words;
+  }
+
+  private async fromPythonWhisper(videoPath: string, config: Config): Promise<WhisperWord[]> {
+    log.info(`Running Python Whisper fallback for captions (model: ${config.whisperModel})...`);
+
+    const script = `
+import json
+import whisper
+
+model = whisper.load_model(${JSON.stringify(config.whisperModel)})
+result = model.transcribe(${JSON.stringify(videoPath)}, language="en", word_timestamps=True)
+segments = []
+for seg in result.get("segments", []):
+    segments.append({
+        "text": seg.get("text", "").strip(),
+        "start": seg.get("start", 0),
+        "end": seg.get("end", 0),
+        "words": [
+            {
+                "word": word.get("word", ""),
+                "start": word.get("start"),
+                "end": word.get("end"),
+            }
+            for word in seg.get("words", []) or []
+        ],
+    })
+print(json.dumps(segments))
+`;
+
+    const proc = Bun.spawn(["python3", "-c", script], { stdout: "pipe", stderr: "pipe" });
+    const stdout = await new Response(proc.stdout).text();
+    const stderr = await new Response(proc.stderr).text();
+    const exitCode = await proc.exited;
+
+    if (exitCode !== 0) {
+      throw new Error(`Python Whisper fallback failed: ${stderr}`);
+    }
+
+    const segments = JSON.parse(stdout) as PythonWhisperSegment[];
+    const words = this.expandPythonSegmentsToWords(segments);
+
+    if (words.length === 0) {
+      throw new Error("Python Whisper fallback produced no caption words.");
+    }
+
+    log.info(`Python Whisper fallback extracted ${words.length} words`);
+    return words;
+  }
+
+  private expandPythonSegmentsToWords(segments: PythonWhisperSegment[]): WhisperWord[] {
+    const words: WhisperWord[] = [];
+
+    for (const segment of segments) {
+      const explicitWords = this.extractExplicitWords(segment);
+      if (explicitWords.length > 0) {
+        words.push(...explicitWords);
+        continue;
+      }
+
+      words.push(...this.estimateWordsFromSegment(segment));
+    }
+
+    return words;
+  }
+
+  private extractExplicitWords(segment: PythonWhisperSegment): WhisperWord[] {
+    const explicitWords = segment.words ?? [];
+    const words: WhisperWord[] = [];
+
+    for (const entry of explicitWords) {
+      const text = entry.word?.trim();
+      if (!text || text.startsWith("[")) {
+        continue;
+      }
+
+      if (
+        (/^[,.\?!;:]$/.test(text) || text.startsWith("'")) &&
+        words.length > 0 &&
+        entry.end !== undefined
+      ) {
+        words[words.length - 1].word += text;
+        words[words.length - 1].end = entry.end;
+        continue;
+      }
+
+      if (entry.start === undefined || entry.end === undefined) {
+        continue;
+      }
+
+      words.push({
+        word: text,
+        start: entry.start,
+        end: entry.end,
+      });
+    }
+
+    return words;
+  }
+
+  private estimateWordsFromSegment(segment: PythonWhisperSegment): WhisperWord[] {
+    const tokens = segment.text
+      .split(/\s+/)
+      .map((word) => word.trim())
+      .filter(Boolean);
+
+    if (tokens.length === 0) {
+      return [];
+    }
+
+    const duration = Math.max(0.12, segment.end - segment.start);
+    const perWord = duration / tokens.length;
+
+    return tokens.map((word, index) => {
+      const start = segment.start + perWord * index;
+      const end = index === tokens.length - 1 ? segment.end : segment.start + perWord * (index + 1);
+      return {
+        word,
+        start,
+        end: Math.max(start + 0.05, end),
+      };
+    });
   }
 
   private groupWords(words: CaptionWord[]): CaptionGroup[] {

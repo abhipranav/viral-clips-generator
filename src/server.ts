@@ -144,7 +144,8 @@ function summarizeRun(
   const stageResults = checkpoint.getStageResultsForRun(runId);
   const clipProgress = checkpoint.getClipProgressEntries(runId);
   const clipStageResult = checkpoint.getStageResult<ClipCandidate[]>(runId, PipelineStage.IDENTIFY_CLIPS);
-  const clipMap = new Map((clipStageResult?.data ?? []).map((clip) => [clip.id, clip]));
+  const clipCandidates = Array.isArray(clipStageResult?.data) ? clipStageResult.data : [];
+  const clipMap = new Map(clipCandidates.map((clip) => [clip.id, clip]));
   const outputs = clipProgress
     .filter((entry) => Boolean(entry.artifactPaths.finalReelPath))
     .map((entry) => ({

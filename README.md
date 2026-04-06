@@ -161,6 +161,20 @@ Recommended instance posture:
 - 2 GB swap file
 - EBS volume sized for temporary uploads plus rendered clips
 
+## Local Caption Setup For `whisper-cli`
+
+If you want the fast caption path on your laptop, install `whisper-cli` and a local ggml model file.
+
+Example env:
+
+```bash
+WHISPER_CLI_BIN=whisper-cli
+WHISPER_CLI_MODEL_PATH=/absolute/path/to/ggml-tiny.bin
+GENERATE_CAPTIONS=true
+```
+
+If `whisper-cli` is installed but the ggml model file is missing, the app now falls back to Python Whisper automatically.
+
 ## Testing
 
 ```bash
