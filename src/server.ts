@@ -170,6 +170,8 @@ export function startApiServer(config: Config): void {
   ensureDir(config.paths.output);
   ensureDir(config.paths.uploads);
 
+  const startedAt = new Date().toISOString();
+
   const checkpoint = new CheckpointManager(config.paths.checkpointDb);
   const orchestrator = new PipelineOrchestrator(config, checkpoint);
   const queue = new PipelineJobQueue(config.jobConcurrency);
@@ -189,6 +191,8 @@ export function startApiServer(config: Config): void {
         if (request.method === "GET" && path === "/health") {
           return json({
             ok: true,
+            startedAt,
+            uptimeSeconds: Math.floor(process.uptime()),
             queue: queue.getStats(),
             whisperModel: config.whisperModel,
             maxParallelClips: config.maxParallelClips,
