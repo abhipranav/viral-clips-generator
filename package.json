@@ -1,0 +1,45 @@
+{
+  "name": "jiang-clips",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "pipeline": "bun run src/index.ts pipeline",
+    "file": "bun run src/index.ts file",
+    "batch": "bun run src/index.ts batch",
+    "api": "bun run src/index.ts api",
+    "api:dev": "bun run src/index.ts api",
+    "resume": "bun run src/index.ts resume",
+    "status": "bun run src/index.ts status",
+    "clean": "bun run src/index.ts clean",
+    "web:dev": "cd web && bun run dev",
+    "web:build": "cd web && bun run build",
+    "web:start": "cd web && bun run start",
+    "test": "bun test",
+    "test:unit": "bun test tests/utils tests/pipeline",
+    "test:e2e": "bun test tests/modules",
+    "lint": "oxlint",
+    "format": "oxfmt --write src tests",
+    "format:check": "oxfmt --check src tests"
+  },
+  "dependencies": {
+    "@google/genai": "^1.0.0",
+    "@remotion/bundler": "^4.0.436",
+    "@remotion/cli": "^4.0.436",
+    "@remotion/renderer": "^4.0.436",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "chalk": "^5.4.1",
+    "commander": "^13.1.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "remotion": "^4.0.436",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.10",
+    "oxfmt": "^0.41.0",
+    "oxlint": "^1.56.0",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,17 @@
+node_modules/
+dist/
+data/
+output/
+assets/subway-surfers/*.mp4
+assets/subway-surfers/*.mkv
+assets/subway-surfers/*.webm
+.env
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+models/
+firebase-debug.log
+.firebase/
+*.log
+.DS_Store
