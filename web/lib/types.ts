@@ -40,7 +40,8 @@ export interface RunRecord {
   createdAt: string;
   updatedAt: string;
   currentStage: string;
-  status: "queued" | "running" | "paused" | "completed" | "failed";
+  status: "queued" | "running" | "paused" | "completed" | "failed" | "incomplete";
+  persistedStatus?: "queued" | "running" | "paused" | "completed" | "failed" | "incomplete";
   stages: RunStage[];
   clips: RunClip[];
   outputs: RunOutput[];

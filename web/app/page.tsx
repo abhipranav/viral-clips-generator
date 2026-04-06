@@ -60,6 +60,10 @@ function statusLabel(run: RunRecord): string {
     return `${run.status} · ${run.currentStage}`;
   }
 
+  if (run.status === "incomplete") {
+    return `incomplete · stalled at ${run.currentStage}`;
+  }
+
   return run.status;
 }
 
@@ -471,11 +475,27 @@ export default function HomePage() {
               <p className="eyebrow">Details</p>
               <h2>{selectedRun?.videoTitle || "Choose a run"}</h2>
             </div>
-            {selectedRun ? <span className="pill">{selectedRun.status}</span> : null}
+            {selectedRun ? (
+              <span className={`pill ${selectedRun.status === "incomplete" ? "pill-warning" : ""}`}>
+                {selectedRun.status}
+              </span>
+            ) : null}
           </div>
 
           {selectedRun ? (
             <div className="detail-grid">
+              {selectedRun.status === "incomplete" ? (
+                <article className="detail-block detail-warning">
+                  <h3>Needs Resume</h3>
+                  <p className="supporting-copy">
+                    This run was previously stored as completed, but its clip stages never reached
+                    final output. Resume it from the backend to finish captions and reel
+                    composition.
+                  </p>
+                  <code className="inline-command">bun run resume {selectedRun.id}</code>
+                </article>
+              ) : null}
+
               <article className="detail-block">
                 <h3>Pipeline</h3>
                 <div className="stage-list">
