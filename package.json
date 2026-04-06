@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "dev": "bun run dev:api",
+    "dev:api": "bun run src/index.ts api",
+    "dev:web": "cd web && bun run dev",
     "start": "bun run src/index.ts",
     "pipeline": "bun run src/index.ts pipeline",
     "file": "bun run src/index.ts file",
