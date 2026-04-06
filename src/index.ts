@@ -4,7 +4,9 @@ import chalk from "chalk";
 import { loadConfig } from "./config";
 import { Downloader } from "./modules/downloader";
 import { CheckpointManager } from "./pipeline/checkpoint";
+import { deriveRunState } from "./pipeline/run-health";
 import { PipelineOrchestrator } from "./pipeline/orchestrator";
+import { PipelineStage, type ClipCandidate } from "./pipeline/types";
 import { startApiServer } from "./server";
 import { cleanRunArtifacts } from "./utils/fs";
 import { createLogger } from "./utils/logger";
@@ -142,12 +144,28 @@ program
         log.error(`Run not found: ${runId}`);
         process.exit(1);
       }
+      const stageResults = checkpoint.getStageResultsForRun(runId);
+      const clipProgress = checkpoint.getClipProgressEntries(runId);
+      const clipStageResult = checkpoint.getStageResult<ClipCandidate[]>(
+        runId,
+        PipelineStage.IDENTIFY_CLIPS,
+      );
+      const clipCandidates = Array.isArray(clipStageResult?.data) ? clipStageResult.data : [];
+      const derived = deriveRunState({
+        run,
+        stageResults,
+        clipProgress,
+        clipCandidates,
+      });
       console.log(chalk.bold(`\nRun: ${run.id}`));
       console.log(`  Video: ${run.videoUrl}`);
-      console.log(`  Status: ${colorStatus(run.status)}`);
-      console.log(`  Stage: ${run.currentStage}`);
+      console.log(`  Status: ${colorStatus(derived.status)}`);
+      console.log(`  Stage: ${derived.currentStage}`);
       console.log(`  Created: ${run.createdAt}`);
       console.log(`  Updated: ${run.updatedAt}`);
+      if (derived.status !== run.status) {
+        console.log(`  Stored status: ${run.status}`);
+      }
     } else {
       const runs = checkpoint.getAllRuns();
       if (runs.length === 0) {
@@ -156,8 +174,21 @@ program
       }
       console.log(chalk.bold(`\n${runs.length} pipeline runs:\n`));
       for (const run of runs) {
+        const stageResults = checkpoint.getStageResultsForRun(run.id);
+        const clipProgress = checkpoint.getClipProgressEntries(run.id);
+        const clipStageResult = checkpoint.getStageResult<ClipCandidate[]>(
+          run.id,
+          PipelineStage.IDENTIFY_CLIPS,
+        );
+        const clipCandidates = Array.isArray(clipStageResult?.data) ? clipStageResult.data : [];
+        const derived = deriveRunState({
+          run,
+          stageResults,
+          clipProgress,
+          clipCandidates,
+        });
         console.log(
-          `  ${chalk.dim(run.id.slice(0, 8))} ${colorStatus(run.status)} ${chalk.cyan(run.currentStage)} ${run.videoTitle || run.videoId}`,
+          `  ${chalk.dim(run.id.slice(0, 8))} ${colorStatus(derived.status)} ${chalk.cyan(derived.currentStage)} ${run.videoTitle || run.videoId}`,
         );
       }
     }
@@ -186,6 +217,8 @@ function colorStatus(status: string): string {
       return chalk.yellow(status);
     case "queued":
       return chalk.blue(status);
+    case "incomplete":
+      return chalk.magenta(status);
     default:
       return chalk.gray(status);
   }

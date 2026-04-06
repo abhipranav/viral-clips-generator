@@ -40,7 +40,7 @@ export interface PipelineRun {
   createdAt: string;
   updatedAt: string;
   currentStage: PipelineStage;
-  status: "queued" | "running" | "paused" | "completed" | "failed";
+  status: "queued" | "running" | "paused" | "completed" | "failed" | "incomplete";
 }
 
 export interface StageResult<T = unknown> {

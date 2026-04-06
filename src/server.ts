@@ -2,6 +2,8 @@ import { relative, resolve, sep } from "path";
 
 import type { Config } from "./config";
 import { CheckpointManager } from "./pipeline/checkpoint";
+import { migrateLegacyFinalReelPath } from "./pipeline/output-names";
+import { deriveRunState } from "./pipeline/run-health";
 import { PipelineStage, type ClipCandidate, type PipelineInput } from "./pipeline/types";
 import { PipelineOrchestrator } from "./pipeline/orchestrator";
 import { ensureDir, sanitizeFileName } from "./utils/fs";
@@ -146,17 +148,38 @@ function summarizeRun(
   const clipStageResult = checkpoint.getStageResult<ClipCandidate[]>(runId, PipelineStage.IDENTIFY_CLIPS);
   const clipCandidates = Array.isArray(clipStageResult?.data) ? clipStageResult.data : [];
   const clipMap = new Map(clipCandidates.map((clip) => [clip.id, clip]));
+  const derived = deriveRunState({
+    run,
+    stageResults,
+    clipProgress,
+    clipCandidates,
+  });
   const outputs = clipProgress
     .filter((entry) => Boolean(entry.artifactPaths.finalReelPath))
-    .map((entry) => ({
-      clipId: entry.clipId,
-      title: clipMap.get(entry.clipId)?.title ?? entry.clipId,
-      path: entry.artifactPaths.finalReelPath,
-      url: buildMediaUrl(entry.artifactPaths.finalReelPath, config),
-    }));
+    .map((entry) => {
+      const clip = clipMap.get(entry.clipId);
+      const finalPath = clip
+        ? migrateLegacyFinalReelPath({
+            runId,
+            checkpoint,
+            clip,
+            progress: entry,
+          })
+        : entry.artifactPaths.finalReelPath;
+
+      return {
+        clipId: entry.clipId,
+        title: clip?.title ?? entry.clipId,
+        path: finalPath,
+        url: buildMediaUrl(finalPath, config),
+      };
+    });
 
   return {
     ...run,
+    status: derived.status,
+    currentStage: derived.currentStage,
+    persistedStatus: derived.persistedStatus,
     stages: stageResults,
     clips: clipProgress.map((entry) => ({
       ...entry,
