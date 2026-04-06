@@ -199,6 +199,24 @@ export function startApiServer(config: Config): void {
           });
         }
 
+        if (request.method === "GET" && path === "/readyz") {
+          try {
+            checkpoint.getAllRuns();
+            return json({
+              ok: true,
+              checkpointDb: config.paths.checkpointDb,
+            });
+          } catch (err) {
+            return json(
+              {
+                ok: false,
+                error: err instanceof Error ? err.message : "Checkpoint readiness check failed.",
+              },
+              503,
+            );
+          }
+        }
+
         if (request.method === "GET" && path === "/api/jobs") {
           const runs = checkpoint.getAllRuns().map((run) => summarizeRun(run.id, checkpoint, config));
           return json({
