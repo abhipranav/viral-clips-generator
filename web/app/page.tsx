@@ -3,7 +3,13 @@
 import type { FormEvent } from "react";
 import { startTransition, useDeferredValue, useEffect, useState } from "react";
 
-import { createRun, fetchDashboard, fetchRun, resolveMediaUrl } from "../lib/api";
+import {
+  createRun,
+  createRunFromYouTube,
+  fetchDashboard,
+  fetchRun,
+  resolveMediaUrl,
+} from "../lib/api";
 import type { QueueStats, RunRecord } from "../lib/types";
 
 const defaultQueue: QueueStats = {
@@ -11,6 +17,7 @@ const defaultQueue: QueueStats = {
   running: 0,
   concurrency: 1,
 };
+const localDownloaderEnabled = process.env.NEXT_PUBLIC_LOCAL_YTDLP_ENABLED === "true";
 
 function formatTimestamp(value: string): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -33,12 +40,17 @@ export default function HomePage() {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [selectedRun, setSelectedRun] = useState<RunRecord | null>(null);
   const [title, setTitle] = useState("");
+  const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [cookiesBrowser, setCookiesBrowser] = useState("chrome");
+  const [keepLocalCopy, setKeepLocalCopy] = useState(false);
   const [maxClips, setMaxClips] = useState("5");
   const [generateCaptions, setGenerateCaptions] = useState(false);
   const [removeSilence, setRemoveSilence] = useState(true);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isLocalDownloading, setIsLocalDownloading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [localMessage, setLocalMessage] = useState<string | null>(null);
   const deferredRuns = useDeferredValue(runs);
 
   useEffect(() => {
@@ -147,6 +159,51 @@ export default function HomePage() {
     }
   }
 
+  async function handleLocalDownload(): Promise<void> {
+    if (!youtubeUrl.trim()) {
+      setLocalMessage("Paste a YouTube URL before starting the local bridge.");
+      return;
+    }
+
+    setIsLocalDownloading(true);
+    setLocalMessage(null);
+
+    try {
+      const response = await createRunFromYouTube({
+        youtubeUrl,
+        title,
+        maxClips,
+        generateCaptions,
+        removeSilence,
+        cookiesBrowser,
+        keepLocalCopy,
+      });
+
+      setLocalMessage(
+        response.localFilePath
+          ? `Downloaded locally and queued as ${response.runId}. Kept copy at ${response.localFilePath}`
+          : `Downloaded locally and queued as ${response.runId}.`,
+      );
+      setYoutubeUrl("");
+
+      startTransition(() => {
+        setSelectedRunId(response.runId);
+      });
+
+      const dashboard = await fetchDashboard();
+      setQueue(dashboard.queue);
+      setRuns(dashboard.runs);
+
+      const detail = await fetchRun(response.runId);
+      setQueue(detail.queue);
+      setSelectedRun(detail.run);
+    } catch (err) {
+      setLocalMessage(err instanceof Error ? err.message : "Local download bridge failed.");
+    } finally {
+      setIsLocalDownloading(false);
+    }
+  }
+
   return (
     <main className="shell">
       <section className="hero">
@@ -178,26 +235,14 @@ export default function HomePage() {
       </section>
 
       <section className="workspace">
-        <form className="panel upload-panel" onSubmit={handleSubmit}>
+        <section className="panel upload-panel">
           <div className="panel-head">
             <div>
               <p className="eyebrow">New Run</p>
-              <h2>Send an uploaded source video</h2>
+              <h2>Pick your input source</h2>
             </div>
             <span className="pill">{generateCaptions ? "Caption Mode" : "Fast Mode"}</span>
           </div>
-
-          <label className="field">
-            <span>Video file</span>
-            <input
-              type="file"
-              accept="video/*"
-              onChange={(event) => {
-                const nextFile = event.target.files?.[0] || null;
-                setVideoFile(nextFile);
-              }}
-            />
-          </label>
 
           <label className="field">
             <span>Clip pack title</span>
@@ -240,9 +285,98 @@ export default function HomePage() {
             </label>
           </div>
 
-          <button className="primary-button" disabled={isUploading} type="submit">
-            {isUploading ? "Queueing..." : "Start Cloud Run"}
-          </button>
+          <div className="source-section">
+            <div className="section-header">
+              <div>
+                <p className="eyebrow">Laptop Bridge</p>
+                <h3>Download with local yt-dlp, then forward to EC2</h3>
+              </div>
+              <span className={`pill ${localDownloaderEnabled ? "" : "pill-muted"}`}>
+                {localDownloaderEnabled ? "Enabled Here" : "Disabled Here"}
+              </span>
+            </div>
+
+            <label className="field">
+              <span>YouTube URL</span>
+              <input
+                type="url"
+                placeholder="https://www.youtube.com/watch?v=..."
+                value={youtubeUrl}
+                onChange={(event) => setYoutubeUrl(event.target.value)}
+              />
+            </label>
+
+            <label className="field">
+              <span>Cookies source</span>
+              <select
+                className="select-input"
+                value={cookiesBrowser}
+                onChange={(event) => setCookiesBrowser(event.target.value)}
+              >
+                <option value="chrome">Chrome</option>
+                <option value="brave">Brave</option>
+                <option value="firefox">Firefox</option>
+                <option value="edge">Edge</option>
+                <option value="safari">Safari</option>
+                <option value="chromium">Chromium</option>
+                <option value="none">No browser cookies</option>
+              </select>
+            </label>
+
+            <label className="toggle">
+              <input
+                type="checkbox"
+                checked={keepLocalCopy}
+                onChange={(event) => setKeepLocalCopy(event.target.checked)}
+              />
+              <span>Keep local copy after upload</span>
+            </label>
+
+            <button
+              className="primary-button"
+              disabled={!localDownloaderEnabled || isLocalDownloading}
+              onClick={() => {
+                void handleLocalDownload();
+              }}
+              type="button"
+            >
+              {isLocalDownloading ? "Downloading Locally..." : "Download Here, Run On EC2"}
+            </button>
+
+            <p className="supporting-copy">
+              Run the Next app on your Mac with `LOCAL_YTDLP_ENABLED=true` and `yt-dlp`
+              installed. This route never downloads on EC2.
+            </p>
+
+            {localMessage ? <p className="message">{localMessage}</p> : null}
+          </div>
+
+          <div className="panel-divider" />
+
+          <form className="source-section" onSubmit={handleSubmit}>
+            <div className="section-header">
+              <div>
+                <p className="eyebrow">Manual Upload</p>
+                <h3>Pick a finished video file yourself</h3>
+              </div>
+            </div>
+
+            <label className="field">
+              <span>Video file</span>
+              <input
+                type="file"
+                accept="video/*"
+                onChange={(event) => {
+                  const nextFile = event.target.files?.[0] || null;
+                  setVideoFile(nextFile);
+                }}
+              />
+            </label>
+
+            <button className="primary-button" disabled={isUploading} type="submit">
+              {isUploading ? "Queueing..." : "Upload File To EC2"}
+            </button>
+          </form>
 
           <p className="supporting-copy">
             Default profile is tuned for a 4 GB EC2 instance: one worker, smaller Whisper model,
@@ -250,7 +384,7 @@ export default function HomePage() {
           </p>
 
           {message ? <p className="message">{message}</p> : null}
-        </form>
+        </section>
 
         <section className="panel run-panel">
           <div className="panel-head">
