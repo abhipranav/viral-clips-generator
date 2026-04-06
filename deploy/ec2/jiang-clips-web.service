@@ -1,0 +1,17 @@
+[Unit]
+Description=Jiang Clips Next.js Dashboard
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/jiang-clips/web
+Environment=PORT=3000
+EnvironmentFile=/opt/jiang-clips/web/.env.local
+ExecStart=/usr/local/bin/bun run start
+Restart=always
+RestartSec=5
+User=ubuntu
+Group=ubuntu
+
+[Install]
+WantedBy=multi-user.target

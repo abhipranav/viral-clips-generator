@@ -1,0 +1,16 @@
+[Unit]
+Description=Jiang Clips Bun API
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/jiang-clips
+EnvironmentFile=/opt/jiang-clips/.env
+ExecStart=/usr/local/bin/bun run api
+Restart=always
+RestartSec=5
+User=ubuntu
+Group=ubuntu
+
+[Install]
+WantedBy=multi-user.target
