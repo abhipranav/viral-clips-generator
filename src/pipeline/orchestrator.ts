@@ -7,7 +7,8 @@ import { ClipIdentifier } from "../modules/clip-identifier";
 import { InputResolver } from "../modules/input-resolver";
 import { Transcriber } from "../modules/transcriber";
 import { VideoProcessor } from "../modules/video-processor";
-import { buildClipOutputFileName, ensureDir, runDir, slugify } from "../utils/fs";
+import { runFfprobe } from "../utils/ffmpeg";
+import { buildClipOutputFileName, ensureDir, fileExists, runDir, slugify } from "../utils/fs";
 import { createLogger } from "../utils/logger";
 import { CheckpointManager } from "./checkpoint";
 import { PipelineStage, type PipelineInput, type ClipArtifacts, type ClipCandidate, type Transcript, type VideoMetadata } from "./types";
@@ -314,9 +315,12 @@ export class PipelineOrchestrator {
   ): Promise<ClipArtifacts> {
     const artifacts: Partial<ClipArtifacts> = { clipId: clip.id };
     const progress = this.checkpoint.getClipProgress(runId, clip.id);
+    const storedArtifacts = progress?.artifactPaths;
 
-    if (progress?.artifactPaths?.extractedVideoPath) {
-      artifacts.extractedVideoPath = progress.artifactPaths.extractedVideoPath;
+    if (
+      await this.canReuseMediaArtifact(storedArtifacts?.extractedVideoPath, "extracted clip", clip.id)
+    ) {
+      artifacts.extractedVideoPath = storedArtifacts!.extractedVideoPath;
     } else {
       this.checkpoint.updateClipProgress(
         runId,
@@ -341,8 +345,14 @@ export class PipelineOrchestrator {
       );
     }
 
-    if (progress?.artifactPaths?.silenceRemovedPath) {
-      artifacts.silenceRemovedPath = progress.artifactPaths.silenceRemovedPath;
+    if (
+      await this.canReuseMediaArtifact(
+        storedArtifacts?.silenceRemovedPath,
+        "silence-removed clip",
+        clip.id,
+      )
+    ) {
+      artifacts.silenceRemovedPath = storedArtifacts!.silenceRemovedPath;
     } else if (!config.removeSilence) {
       artifacts.silenceRemovedPath = artifacts.extractedVideoPath;
       this.checkpoint.updateClipProgress(
@@ -385,8 +395,10 @@ export class PipelineOrchestrator {
       );
     }
 
-    if (progress?.artifactPaths?.captionOverlayPath) {
-      artifacts.captionOverlayPath = progress.artifactPaths.captionOverlayPath;
+    if (
+      await this.canReuseMediaArtifact(storedArtifacts?.captionOverlayPath, "caption overlay", clip.id)
+    ) {
+      artifacts.captionOverlayPath = storedArtifacts!.captionOverlayPath;
     } else if (!config.generateCaptions) {
       artifacts.captionOverlayPath = "";
       this.checkpoint.updateClipProgress(
@@ -435,8 +447,8 @@ export class PipelineOrchestrator {
       );
     }
 
-    if (progress?.artifactPaths?.finalReelPath) {
-      artifacts.finalReelPath = progress.artifactPaths.finalReelPath;
+    if (await this.canReuseMediaArtifact(storedArtifacts?.finalReelPath, "final reel", clip.id)) {
+      artifacts.finalReelPath = storedArtifacts!.finalReelPath;
     } else {
       this.checkpoint.updateClipProgress(
         runId,
@@ -473,6 +485,29 @@ export class PipelineOrchestrator {
     }
 
     return artifacts as ClipArtifacts;
+  }
+
+  private async canReuseMediaArtifact(
+    artifactPath: string | undefined,
+    artifactLabel: string,
+    clipId: string,
+  ): Promise<boolean> {
+    if (!artifactPath) {
+      return false;
+    }
+
+    if (!(await fileExists(artifactPath))) {
+      log.warn(`Stored ${artifactLabel} missing for clip ${clipId}; regenerating`);
+      return false;
+    }
+
+    try {
+      await runFfprobe(artifactPath);
+      return true;
+    } catch (err) {
+      log.warn(`Stored ${artifactLabel} invalid for clip ${clipId}; regenerating (${err})`);
+      return false;
+    }
   }
 
   private extractInputId(input: PipelineInput): string {

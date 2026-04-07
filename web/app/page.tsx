@@ -10,6 +10,7 @@ import {
   type AppSettings,
 } from "../lib/settings";
 import {
+  cleanupRun,
   createRun,
   createRunFromYouTube,
   fetchDashboard,
@@ -89,6 +90,7 @@ export default function HomePage() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isLocalDownloading, setIsLocalDownloading] = useState(false);
+  const [isCleaningRun, setIsCleaningRun] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [localMessage, setLocalMessage] = useState<string | null>(null);
   const [appSettings, setAppSettings] = useState<AppSettings>(appSettingsDefaults);
@@ -279,6 +281,43 @@ export default function HomePage() {
       setLocalMessage(err instanceof Error ? err.message : "Local download bridge failed.");
     } finally {
       setIsLocalDownloading(false);
+    }
+  }
+
+  async function handleCleanupSelectedRun(): Promise<void> {
+    if (!selectedRun) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Remove the uploaded source video and intermediate worker artifacts? Final MP4 reels will be kept.",
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setIsCleaningRun(true);
+    setMessage(null);
+
+    try {
+      const response = await cleanupRun(selectedRun.id);
+      setMessage(
+        response.removedUploadSource
+          ? "Uploaded source and intermediate artifacts were removed from the worker. Final reels were kept."
+          : "Intermediate worker artifacts were removed. Final reels were kept.",
+      );
+
+      const dashboard = await fetchDashboard();
+      setQueue(dashboard.queue);
+      setRuns(dashboard.runs);
+
+      const detail = await fetchRun(selectedRun.id);
+      setQueue(detail.queue);
+      setSelectedRun(detail.run);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Cleanup failed.");
+    } finally {
+      setIsCleaningRun(false);
     }
   }
 
@@ -547,6 +586,26 @@ export default function HomePage() {
                 </article>
               ) : null}
 
+              {selectedRun.status === "completed" ? (
+                <article className="detail-block">
+                  <h3>Storage</h3>
+                  <p className="supporting-copy">
+                    After downloading the final reels, you can remove the uploaded source and
+                    intermediate worker artifacts to free space on EC2. Final MP4 reels are kept.
+                  </p>
+                  <button
+                    className="secondary-button"
+                    disabled={isCleaningRun}
+                    onClick={() => {
+                      void handleCleanupSelectedRun();
+                    }}
+                    type="button"
+                  >
+                    {isCleaningRun ? "Cleaning..." : "Cleanup Temp Files"}
+                  </button>
+                </article>
+              ) : null}
+
               <article className="detail-block">
                 <h3>Pipeline</h3>
                 <div className="stage-list">
@@ -570,13 +629,23 @@ export default function HomePage() {
                           <p>{output.clipId}</p>
                         </div>
                         {output.url ? (
-                          <video
-                            autoPlay={appSettings.previewAutoplay}
-                            controls
-                            muted={appSettings.previewMutedByDefault}
-                            preload="metadata"
-                            src={resolveMediaUrl(output.url)}
-                          />
+                          <>
+                            <video
+                              autoPlay={appSettings.previewAutoplay}
+                              controls
+                              muted={appSettings.previewMutedByDefault}
+                              preload="metadata"
+                              src={resolveMediaUrl(output.url)}
+                            />
+                            <a
+                              className="secondary-button download-link"
+                              href={resolveMediaUrl(`${output.url}?download=1`)}
+                              rel="noreferrer"
+                              target="_blank"
+                            >
+                              Download MP4
+                            </a>
+                          </>
                         ) : null}
                       </div>
                     ))

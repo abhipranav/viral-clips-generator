@@ -63,6 +63,13 @@ export interface CreateRunResponse {
   queue: QueueStats;
 }
 
+export interface CleanupRunResponse {
+  ok: boolean;
+  runId: string;
+  removedUploadSource: boolean;
+  removedIntermediateArtifacts: boolean;
+}
+
 export interface LocalDownloadRequest {
   youtubeUrl: string;
   title?: string;

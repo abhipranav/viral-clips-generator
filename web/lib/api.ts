@@ -1,4 +1,5 @@
 import type {
+  CleanupRunResponse,
   CreateRunResponse,
   DashboardResponse,
   LocalDownloadRequest,
@@ -37,6 +38,13 @@ export async function createRun(formData: FormData): Promise<CreateRunResponse> 
     body: formData,
   });
   return await parseJson<CreateRunResponse>(response);
+}
+
+export async function cleanupRun(runId: string): Promise<CleanupRunResponse> {
+  const response = await fetch(`${apiBaseUrl}/api/jobs/${runId}/cleanup`, {
+    method: "POST",
+  });
+  return await parseJson<CleanupRunResponse>(response);
 }
 
 export async function createRunFromYouTube(

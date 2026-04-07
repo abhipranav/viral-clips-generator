@@ -1,4 +1,5 @@
-import { relative, resolve, sep } from "path";
+import { existsSync, rmSync } from "fs";
+import { basename, relative, resolve, sep } from "path";
 
 import type { Config } from "./config";
 import { CheckpointManager } from "./pipeline/checkpoint";
@@ -6,7 +7,7 @@ import { migrateLegacyFinalReelPath } from "./pipeline/output-names";
 import { deriveRunState } from "./pipeline/run-health";
 import { PipelineStage, type ClipCandidate, type PipelineInput } from "./pipeline/types";
 import { PipelineOrchestrator } from "./pipeline/orchestrator";
-import { ensureDir, sanitizeFileName } from "./utils/fs";
+import { cleanRunArtifacts, ensureDir, sanitizeFileName } from "./utils/fs";
 import { createLogger } from "./utils/logger";
 
 const log = createLogger("api");
@@ -133,6 +134,33 @@ function resolveMediaPath(rootKey: string, rest: string, config: Config): string
   return candidate;
 }
 
+function cleanupRunStorage(runId: string, checkpoint: CheckpointManager, config: Config): {
+  removedUploadSource: boolean;
+  removedIntermediateArtifacts: boolean;
+} {
+  const run = checkpoint.getRunInfo(runId);
+  if (!run) {
+    throw new Error(`Run not found: ${runId}`);
+  }
+
+  cleanRunArtifacts(config.paths.data, runId, true);
+
+  let removedUploadSource = false;
+  if (run.sourceType === "upload") {
+    const uploadRoot = resolve(config.paths.uploads);
+    const sourcePath = resolve(run.sourceRef);
+    if (withinRoot(sourcePath, uploadRoot) && existsSync(sourcePath)) {
+      rmSync(sourcePath, { force: true });
+      removedUploadSource = true;
+    }
+  }
+
+  return {
+    removedUploadSource,
+    removedIntermediateArtifacts: true,
+  };
+}
+
 function summarizeRun(
   runId: string,
   checkpoint: CheckpointManager,
@@ -250,6 +278,10 @@ export function startApiServer(config: Config): void {
         }
 
         if (request.method === "GET" && path.startsWith("/api/jobs/")) {
+          if (path.endsWith("/cleanup")) {
+            return textError("Not found", 404);
+          }
+
           const runId = path.replace("/api/jobs/", "");
           const run = checkpoint.getRunInfo(runId);
           if (!run) {
@@ -313,6 +345,21 @@ export function startApiServer(config: Config): void {
           );
         }
 
+        if (request.method === "POST" && path.startsWith("/api/jobs/") && path.endsWith("/cleanup")) {
+          const runId = path.replace("/api/jobs/", "").replace("/cleanup", "");
+          const run = checkpoint.getRunInfo(runId);
+          if (!run) {
+            return textError("Run not found", 404);
+          }
+
+          const result = cleanupRunStorage(runId, checkpoint, config);
+          return json({
+            ok: true,
+            runId,
+            ...result,
+          });
+        }
+
         if (request.method === "GET" && path.startsWith("/media/")) {
           const [, , rootKey, ...rest] = path.split("/");
           const mediaPath = resolveMediaPath(rootKey, rest.join("/"), config);
@@ -323,6 +370,14 @@ export function startApiServer(config: Config): void {
           const file = Bun.file(mediaPath);
           if (!(await file.exists())) {
             return textError("File not found", 404);
+          }
+
+          if (url.searchParams.get("download") === "1") {
+            return new Response(file, {
+              headers: {
+                "Content-Disposition": `attachment; filename="${basename(mediaPath)}"`,
+              },
+            });
           }
 
           return new Response(file);
