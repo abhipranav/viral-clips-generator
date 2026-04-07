@@ -1,9 +1,12 @@
 import { GoogleGenAI } from "@google/genai";
+
 import { createLogger } from "../utils/logger";
 import type { Config } from "../config";
 import type { Transcript, VideoMetadata, ClipCandidate } from "../pipeline/types";
 
 const log = createLogger("clip-identifier");
+const MAX_GEMINI_ATTEMPTS = 4;
+const BASE_RETRY_DELAY_MS = 2000;
 
 const CLIP_SCHEMA = {
   type: "object" as const,
@@ -68,14 +71,7 @@ ${formattedTranscript}
 
 Return clips sorted by viralScore (highest first). Aim for 5-15 clips depending on video length.`;
 
-    const response = await this.ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: CLIP_SCHEMA,
-      },
-    });
+    const response = await this.generateContentWithRetry(prompt);
 
     const text = response.text ?? "";
     const parsed = JSON.parse(text) as {
@@ -127,4 +123,48 @@ Return clips sorted by viralScore (highest first). Aim for 5-15 clips depending 
     log.info(`Identified ${candidates.length} clip candidates`);
     return candidates;
   }
+
+  private async generateContentWithRetry(prompt: string) {
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= MAX_GEMINI_ATTEMPTS; attempt++) {
+      try {
+        if (attempt > 1) {
+          log.info(`Retrying Gemini clip identification (${attempt}/${MAX_GEMINI_ATTEMPTS})...`);
+        }
+
+        return await this.ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: CLIP_SCHEMA,
+          },
+        });
+      } catch (err) {
+        lastError = err;
+        if (!isRetryableGeminiError(err) || attempt === MAX_GEMINI_ATTEMPTS) {
+          throw err;
+        }
+
+        const delayMs = BASE_RETRY_DELAY_MS * 2 ** (attempt - 1);
+        log.warn(`Gemini temporarily unavailable. Retrying in ${delayMs / 1000}s...`);
+        await Bun.sleep(delayMs);
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error(`Gemini request failed: ${lastError}`);
+  }
+}
+
+function isRetryableGeminiError(err: unknown): boolean {
+  const message =
+    err instanceof Error ? err.message : typeof err === "string" ? err : JSON.stringify(err);
+
+  return (
+    message.includes("\"code\":503") ||
+    message.includes("\"status\":\"UNAVAILABLE\"") ||
+    message.includes("high demand") ||
+    message.includes("temporarily unavailable")
+  );
 }
