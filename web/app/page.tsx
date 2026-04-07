@@ -1,8 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import type { FormEvent } from "react";
 import { startTransition, useDeferredValue, useEffect, useState } from "react";
 
+import {
+  appSettingsDefaults,
+  loadAppSettings,
+  type AppSettings,
+} from "../lib/settings";
 import {
   createRun,
   createRunFromYouTube,
@@ -85,7 +91,18 @@ export default function HomePage() {
   const [isLocalDownloading, setIsLocalDownloading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [localMessage, setLocalMessage] = useState<string | null>(null);
+  const [appSettings, setAppSettings] = useState<AppSettings>(appSettingsDefaults);
   const deferredRuns = useDeferredValue(runs);
+
+  useEffect(() => {
+    const loaded = loadAppSettings();
+    setAppSettings(loaded);
+    setMaxClips(String(loaded.defaultMaxClips));
+    setGenerateCaptions(loaded.defaultGenerateCaptions);
+    setRemoveSilence(loaded.defaultRemoveSilence);
+    setCookiesBrowser(loaded.localBridgeCookiesBrowser);
+    setKeepLocalCopy(loaded.localBridgeKeepLocalCopy);
+  }, []);
 
   useEffect(() => {
     let disposed = false;
@@ -99,7 +116,7 @@ export default function HomePage() {
       setQueue(data.queue);
       setRuns(data.runs);
 
-      if (!selectedRunId && data.runs.length > 0) {
+      if (!selectedRunId && data.runs.length > 0 && appSettings.autoSelectNewestRun) {
         startTransition(() => {
           setSelectedRunId(data.runs[0].id);
         });
@@ -116,15 +133,24 @@ export default function HomePage() {
 
     void loadDashboard();
 
-    const intervalId = window.setInterval(() => {
-      void loadDashboard();
-    }, 5000);
+    const intervalId = appSettings.autoRefreshDashboard
+      ? window.setInterval(() => {
+          void loadDashboard();
+        }, appSettings.pollIntervalSeconds * 1000)
+      : null;
 
     return () => {
       disposed = true;
-      window.clearInterval(intervalId);
+      if (intervalId) {
+        window.clearInterval(intervalId);
+      }
     };
-  }, [selectedRunId]);
+  }, [
+    selectedRunId,
+    appSettings.autoRefreshDashboard,
+    appSettings.autoSelectNewestRun,
+    appSettings.pollIntervalSeconds,
+  ]);
 
   useEffect(() => {
     if (!selectedRunId) {
@@ -157,6 +183,15 @@ export default function HomePage() {
     if (!videoFile) {
       setMessage("Choose a video file before starting a run.");
       return;
+    }
+
+    if (appSettings.confirmBeforeQueue) {
+      const confirmed = window.confirm(
+        "Start this run now with the current processing settings?",
+      );
+      if (!confirmed) {
+        return;
+      }
     }
 
     setIsUploading(true);
@@ -197,6 +232,15 @@ export default function HomePage() {
     if (!youtubeUrl.trim()) {
       setLocalMessage("Paste a YouTube URL before starting the local bridge.");
       return;
+    }
+
+    if (appSettings.confirmBeforeQueue) {
+      const confirmed = window.confirm(
+        "Start local download and queue a run with these settings?",
+      );
+      if (!confirmed) {
+        return;
+      }
     }
 
     setIsLocalDownloading(true);
@@ -252,6 +296,9 @@ export default function HomePage() {
             {workerMode.description}
           </p>
           <p className="supporting-copy">Active API target: {apiBaseUrl}</p>
+          <Link className="secondary-button" href="/settings">
+            Open Settings Control Center
+          </Link>
         </div>
 
         <div className="queue-card">
@@ -427,6 +474,10 @@ export default function HomePage() {
             Default profile is tuned conservatively for a 4 GB box: one worker, smaller Whisper
             model, captions off by default, and only a handful of clips per job.
           </p>
+          <p className="supporting-copy">
+            Polling every {appSettings.pollIntervalSeconds}s. Auto refresh is
+            {appSettings.autoRefreshDashboard ? " on" : " off"}.
+          </p>
 
           {message ? <p className="message">{message}</p> : null}
         </section>
@@ -484,7 +535,7 @@ export default function HomePage() {
 
           {selectedRun ? (
             <div className="detail-grid">
-              {selectedRun.status === "incomplete" ? (
+              {selectedRun.status === "incomplete" && appSettings.showIncompleteWarning ? (
                 <article className="detail-block detail-warning">
                   <h3>Needs Resume</h3>
                   <p className="supporting-copy">
@@ -512,14 +563,20 @@ export default function HomePage() {
                 <h3>Generated Clips</h3>
                 <div className="clip-list">
                   {selectedRun.outputs.length > 0 ? (
-                    selectedRun.outputs.map((output) => (
+                    selectedRun.outputs.slice(0, appSettings.maxVisiblePreviewCards).map((output) => (
                       <div key={output.clipId} className="clip-card">
                         <div>
                           <strong>{output.title}</strong>
                           <p>{output.clipId}</p>
                         </div>
                         {output.url ? (
-                          <video controls preload="metadata" src={resolveMediaUrl(output.url)} />
+                          <video
+                            autoPlay={appSettings.previewAutoplay}
+                            controls
+                            muted={appSettings.previewMutedByDefault}
+                            preload="metadata"
+                            src={resolveMediaUrl(output.url)}
+                          />
                         ) : null}
                       </div>
                     ))
