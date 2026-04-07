@@ -77,8 +77,8 @@ Web env:
 sudo cp /opt/jiang-clips/deploy/ec2/jiang-clips-api.service /etc/systemd/system/
 sudo cp /opt/jiang-clips/deploy/ec2/jiang-clips-web.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now jiang-clips-api
-sudo systemctl enable --now jiang-clips-web
+sudo systemctl enable --now viral-clips-api
+sudo systemctl enable --now viral-clips-web
 ```
 
 ## 6. Configure nginx
