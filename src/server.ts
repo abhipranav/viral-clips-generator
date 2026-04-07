@@ -321,13 +321,18 @@ export function startApiServer(config: Config): void {
             originalFileName: file.name || safeName,
           };
           const runId = orchestrator.createRunRecord(input);
+          const runOptions = {
+            generateCaptions: normalizeBoolean(form.get("generateCaptions"), config.generateCaptions),
+            maxClips: normalizeNumber(form.get("maxClips")),
+            removeSilence: normalizeBoolean(form.get("removeSilence"), config.removeSilence),
+          };
+
+          log.info(
+            `Queued upload job ${runId} (captions=${runOptions.generateCaptions}, removeSilence=${runOptions.removeSilence}, maxClips=${runOptions.maxClips ?? config.maxClips})`,
+          );
 
           queue.enqueue(async () => {
-            await orchestrator.executeRunById(runId, input, {
-              generateCaptions: normalizeBoolean(form.get("generateCaptions"), config.generateCaptions),
-              maxClips: normalizeNumber(form.get("maxClips")),
-              removeSilence: normalizeBoolean(form.get("removeSilence"), config.removeSilence),
-            });
+            await orchestrator.executeRunById(runId, input, runOptions);
           });
 
           return json(

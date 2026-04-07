@@ -85,7 +85,7 @@ export default function HomePage() {
   const [cookiesBrowser, setCookiesBrowser] = useState("chrome");
   const [keepLocalCopy, setKeepLocalCopy] = useState(false);
   const [maxClips, setMaxClips] = useState("5");
-  const [generateCaptions, setGenerateCaptions] = useState(false);
+  const [generateCaptions, setGenerateCaptions] = useState(true);
   const [removeSilence, setRemoveSilence] = useState(true);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
