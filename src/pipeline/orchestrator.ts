@@ -316,6 +316,8 @@ export class PipelineOrchestrator {
     const artifacts: Partial<ClipArtifacts> = { clipId: clip.id };
     const progress = this.checkpoint.getClipProgress(runId, clip.id);
     const storedArtifacts = progress?.artifactPaths;
+    let reusedSilenceRemovedPath = false;
+    let reusedCaptionOverlayPath = false;
 
     if (
       await this.canReuseMediaArtifact(storedArtifacts?.extractedVideoPath, "extracted clip", clip.id)
@@ -353,6 +355,7 @@ export class PipelineOrchestrator {
       )
     ) {
       artifacts.silenceRemovedPath = storedArtifacts!.silenceRemovedPath;
+      reusedSilenceRemovedPath = true;
     } else if (!config.removeSilence) {
       artifacts.silenceRemovedPath = artifacts.extractedVideoPath;
       this.checkpoint.updateClipProgress(
@@ -399,6 +402,7 @@ export class PipelineOrchestrator {
       await this.canReuseMediaArtifact(storedArtifacts?.captionOverlayPath, "caption overlay", clip.id)
     ) {
       artifacts.captionOverlayPath = storedArtifacts!.captionOverlayPath;
+      reusedCaptionOverlayPath = true;
     } else if (!config.generateCaptions) {
       artifacts.captionOverlayPath = "";
       this.checkpoint.updateClipProgress(
@@ -447,7 +451,12 @@ export class PipelineOrchestrator {
       );
     }
 
-    if (await this.canReuseMediaArtifact(storedArtifacts?.finalReelPath, "final reel", clip.id)) {
+    const canReuseFinalReel =
+      (await this.canReuseMediaArtifact(storedArtifacts?.finalReelPath, "final reel", clip.id)) &&
+      reusedSilenceRemovedPath &&
+      (!config.generateCaptions || reusedCaptionOverlayPath);
+
+    if (canReuseFinalReel) {
       artifacts.finalReelPath = storedArtifacts!.finalReelPath;
     } else {
       this.checkpoint.updateClipProgress(
