@@ -20,7 +20,6 @@ export interface AppSettings {
   compactRunCards: boolean;
   enableRunCompletionNotification: boolean;
   previewMutedByDefault: boolean;
-  previewAutoplay: boolean;
   maxVisiblePreviewCards: number;
   confirmBeforeQueue: boolean;
 }
@@ -38,7 +37,6 @@ export const appSettingsDefaults: AppSettings = {
   compactRunCards: false,
   enableRunCompletionNotification: false,
   previewMutedByDefault: true,
-  previewAutoplay: false,
   maxVisiblePreviewCards: 6,
   confirmBeforeQueue: false,
 };
@@ -111,7 +109,6 @@ export function normalizeSettings(payload: Partial<AppSettings> | null | undefin
       appSettingsDefaults.enableRunCompletionNotification,
     ),
     previewMutedByDefault: asBoolean(source.previewMutedByDefault, appSettingsDefaults.previewMutedByDefault),
-    previewAutoplay: asBoolean(source.previewAutoplay, appSettingsDefaults.previewAutoplay),
     maxVisiblePreviewCards: asNumber(
       source.maxVisiblePreviewCards,
       appSettingsDefaults.maxVisiblePreviewCards,

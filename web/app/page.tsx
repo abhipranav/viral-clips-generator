@@ -94,6 +94,7 @@ export default function HomePage() {
   const [message, setMessage] = useState<string | null>(null);
   const [localMessage, setLocalMessage] = useState<string | null>(null);
   const [appSettings, setAppSettings] = useState<AppSettings>(appSettingsDefaults);
+  const [expandedClipId, setExpandedClipId] = useState<string | null>(null);
   const deferredRuns = useDeferredValue(runs);
 
   useEffect(() => {
@@ -178,6 +179,17 @@ export default function HomePage() {
       disposed = true;
     };
   }, [selectedRunId]);
+
+  useEffect(() => {
+    if (!selectedRun) {
+      setExpandedClipId(null);
+      return;
+    }
+
+    if (expandedClipId && !selectedRun.outputs.some((output) => output.clipId === expandedClipId)) {
+      setExpandedClipId(null);
+    }
+  }, [expandedClipId, selectedRun]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -623,18 +635,46 @@ export default function HomePage() {
                 <div className="clip-list">
                   {selectedRun.outputs.length > 0 ? (
                     selectedRun.outputs.slice(0, appSettings.maxVisiblePreviewCards).map((output) => (
-                      <div key={output.clipId} className="clip-card">
-                        <div>
-                          <strong>{output.title}</strong>
-                          <p>{output.clipId}</p>
-                        </div>
-                        {output.url ? (
+                      <div
+                        key={output.clipId}
+                        className={`clip-card ${expandedClipId === output.clipId ? "clip-card-expanded" : "clip-card-collapsed"}`}
+                      >
+                        <button
+                          aria-controls={`clip-player-${output.clipId}`}
+                          aria-expanded={expandedClipId === output.clipId}
+                          className="clip-toggle"
+                          disabled={!output.url}
+                          onClick={() => {
+                            if (!output.url) {
+                              return;
+                            }
+
+                            setExpandedClipId((current) =>
+                              current === output.clipId ? null : output.clipId,
+                            );
+                          }}
+                          type="button"
+                        >
+                          <span className="clip-toggle-icon" aria-hidden="true">
+                            {expandedClipId === output.clipId ? "-" : "+"}
+                          </span>
+                          <span className="clip-toggle-copy">
+                            <strong>{output.title}</strong>
+                            <p>{output.clipId}</p>
+                          </span>
+                        </button>
+
+                        {!output.url ? (
+                          <p className="supporting-copy">This clip is still rendering and is not playable yet.</p>
+                        ) : null}
+
+                        {output.url && expandedClipId === output.clipId ? (
                           <>
                             <video
-                              autoPlay={appSettings.previewAutoplay}
                               controls
+                              id={`clip-player-${output.clipId}`}
                               muted={appSettings.previewMutedByDefault}
-                              preload="metadata"
+                              preload="none"
                               src={resolveMediaUrl(output.url)}
                             />
                             <a

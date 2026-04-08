@@ -22,7 +22,6 @@ function applyPreset(preset: "ec2-safe" | "balanced" | "throughput"): AppSetting
       defaultRemoveSilence: true,
       pollIntervalSeconds: 8,
       autoRefreshDashboard: true,
-      previewAutoplay: false,
       maxVisiblePreviewCards: 4,
       confirmBeforeQueue: true,
     };
@@ -36,7 +35,6 @@ function applyPreset(preset: "ec2-safe" | "balanced" | "throughput"): AppSetting
       defaultRemoveSilence: true,
       pollIntervalSeconds: 3,
       autoRefreshDashboard: true,
-      previewAutoplay: true,
       maxVisiblePreviewCards: 10,
       confirmBeforeQueue: false,
     };
@@ -49,7 +47,6 @@ function applyPreset(preset: "ec2-safe" | "balanced" | "throughput"): AppSetting
     defaultRemoveSilence: true,
     pollIntervalSeconds: 5,
     autoRefreshDashboard: true,
-    previewAutoplay: false,
     maxVisiblePreviewCards: 8,
     confirmBeforeQueue: false,
   };
@@ -340,15 +337,6 @@ export default function SettingsPage() {
               type="checkbox"
             />
             <span>Mute previews by default</span>
-          </label>
-
-          <label className="toggle">
-            <input
-              checked={draft.previewAutoplay}
-              onChange={(event) => updateBoolean("previewAutoplay", event.target.checked)}
-              type="checkbox"
-            />
-            <span>Autoplay preview videos when loaded</span>
           </label>
 
           <label className="toggle">
