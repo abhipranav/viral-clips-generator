@@ -59,7 +59,7 @@ bun run build
 
 Root API env:
 
-- put your `GEMINI_API_KEY`
+- put your `OPENAI_API_KEY`
 - keep `WHISPER_MODEL=tiny`
 - keep `MAX_PARALLEL_CLIPS=1`
 - keep `JOB_CONCURRENCY=1`

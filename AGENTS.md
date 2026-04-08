@@ -34,6 +34,7 @@ oxfmt --check src tests      # Check formatting without writing
 ## Code Style
 
 ### TypeScript
+
 - Use `type` for simple type aliases, `interface` for complex types
 - Prefer `export class` for public classes
 - Use `enum` for related constants (e.g., `PipelineStage`, `StageStatus`)
@@ -41,7 +42,9 @@ oxfmt --check src tests      # Check formatting without writing
 - Use `unknown` instead of `any` for generic error handling
 
 ### Imports
+
 Order imports separated by blank lines:
+
 1. External packages (e.g., `chalk`, `commander`, `zod`)
 2. Internal modules (e.g., `../utils/logger`, `./config`)
 3. Type imports use `import type`
@@ -54,6 +57,7 @@ import type { VideoMetadata } from "../pipeline/types";
 ```
 
 ### Naming Conventions
+
 - **Files**: kebab-case (e.g., `video-processor.ts`, `clip-identifier.ts`)
 - **Classes**: PascalCase (e.g., `PipelineOrchestrator`, `CheckpointManager`)
 - **Functions/variables**: camelCase (e.g., `extractVideoId`, `runId`)
@@ -62,6 +66,7 @@ import type { VideoMetadata } from "../pipeline/types";
 - **Constants**: camelCase or UPPER_SNAKE (logger instances use camelCase module names)
 
 ### Error Handling
+
 - Throw `Error` objects with descriptive messages
 - Wrap async operations in try/catch with proper cleanup in `finally` blocks
 - Log errors before re-throwing: `log.error(\`Failed: ${err}\`); throw err;`
@@ -80,13 +85,17 @@ try {
 ```
 
 ### Path Aliases
+
 Configured in `tsconfig.json`:
+
 ```typescript
-import { createLogger } from "@/utils/logger";  // resolves to ./src/utils/logger
+import { createLogger } from "@/utils/logger"; // resolves to ./src/utils/logger
 ```
 
 ### Logging
+
 Use the `createLogger` utility with module name:
+
 ```typescript
 const log = createLogger("module-name");
 log.info("message");
@@ -127,6 +136,7 @@ tests/
 ## Testing
 
 Uses `bun:test` with `describe`/`test`/`expect`:
+
 ```typescript
 import { describe, test, expect } from "bun:test";
 
@@ -140,7 +150,8 @@ describe("FeatureName", () => {
 ## Configuration
 
 Environment variables validated via Zod in `src/config.ts`:
-- `GEMINI_API_KEY` (required)
+
+- `OPENAI_API_KEY` (required)
 - `WHISPER_MODEL` (tiny|base|small|medium|large, default: base)
 - `MAX_PARALLEL_CLIPS` (1-10, default: 3)
 - `SILENCE_THRESHOLD_DB` (default: -35)
@@ -148,8 +159,8 @@ Environment variables validated via Zod in `src/config.ts`:
 
 ## Dependencies
 
-- **@google/genai**: AI content generation
-- **@remotion/***: Video rendering
+- **OpenAI Responses API**: AI clip selection
+- **@remotion/\***: Video rendering
 - **chalk**: Terminal colors
 - **commander**: CLI framework
 - **zod**: Schema validation

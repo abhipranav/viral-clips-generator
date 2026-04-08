@@ -18,7 +18,7 @@ Next.js dashboard (port 3000)
 Bun API + queue (port 3001)
   -> checkpoint sqlite
   -> ffmpeg / ffprobe
-  -> whisper / Gemini
+  -> whisper / OpenAI GPT-5 mini
   -> output clips
 ```
 
@@ -55,7 +55,7 @@ That keeps the instance focused on one heavy job at a time instead of competing 
 - Bun
 - FFmpeg and FFprobe in `PATH`
 - Python 3 for transcript helpers
-- `GEMINI_API_KEY`
+- `OPENAI_API_KEY`
 - Optional: `whisper` Python package or `whisper-cli`, depending on which stages you enable
 
 ## Install
