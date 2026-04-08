@@ -18,5 +18,6 @@ firebase-debug.log
 web/.next/
 web/.env.local
 web/node_modules/
+web/*.tsbuildinfo
 local-downloads-wyT1vR
 local-downloads-KTJdF3
