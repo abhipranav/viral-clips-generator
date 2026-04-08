@@ -93,6 +93,7 @@ export default function HomePage() {
   const [isCleaningRun, setIsCleaningRun] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [localMessage, setLocalMessage] = useState<string | null>(null);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [appSettings, setAppSettings] = useState<AppSettings>(appSettingsDefaults);
   const [expandedClipId, setExpandedClipId] = useState<string | null>(null);
   const deferredRuns = useDeferredValue(runs);
@@ -111,26 +112,37 @@ export default function HomePage() {
     let disposed = false;
 
     const loadDashboard = async (): Promise<void> => {
-      const data = await fetchDashboard();
-      if (disposed) {
-        return;
-      }
-
-      setQueue(data.queue);
-      setRuns(data.runs);
-
-      if (!selectedRunId && data.runs.length > 0 && appSettings.autoSelectNewestRun) {
-        startTransition(() => {
-          setSelectedRunId(data.runs[0].id);
-        });
-        return;
-      }
-
-      if (selectedRunId) {
-        const match = data.runs.find((run) => run.id === selectedRunId);
-        if (match) {
-          setSelectedRun(match);
+      try {
+        const data = await fetchDashboard();
+        if (disposed) {
+          return;
         }
+
+        setDashboardError(null);
+        setQueue(data.queue);
+        setRuns(data.runs);
+
+        if (!selectedRunId && data.runs.length > 0 && appSettings.autoSelectNewestRun) {
+          startTransition(() => {
+            setSelectedRunId(data.runs[0].id);
+          });
+          return;
+        }
+
+        if (selectedRunId) {
+          const match = data.runs.find((run) => run.id === selectedRunId);
+          if (match) {
+            setSelectedRun(match);
+          }
+        }
+      } catch (err) {
+        if (disposed) {
+          return;
+        }
+
+        setDashboardError(
+          err instanceof Error ? err.message : "Dashboard data could not be loaded from the API.",
+        );
       }
     };
 
@@ -164,13 +176,24 @@ export default function HomePage() {
     let disposed = false;
 
     const loadDetail = async (): Promise<void> => {
-      const detail = await fetchRun(selectedRunId);
-      if (disposed) {
-        return;
-      }
+      try {
+        const detail = await fetchRun(selectedRunId);
+        if (disposed) {
+          return;
+        }
 
-      setQueue(detail.queue);
-      setSelectedRun(detail.run);
+        setDashboardError(null);
+        setQueue(detail.queue);
+        setSelectedRun(detail.run);
+      } catch (err) {
+        if (disposed) {
+          return;
+        }
+
+        setDashboardError(
+          err instanceof Error ? err.message : "Selected run details could not be loaded from the API.",
+        );
+      }
     };
 
     void loadDetail();
@@ -531,6 +554,7 @@ export default function HomePage() {
           </p>
 
           {message ? <p className="message">{message}</p> : null}
+          {dashboardError ? <p className="message">{dashboardError}</p> : null}
         </section>
 
         <section className="panel run-panel">
