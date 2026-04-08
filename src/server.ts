@@ -1,5 +1,6 @@
-import { existsSync, rmSync } from "fs";
-import { basename, relative, resolve, sep } from "path";
+import { existsSync, mkdtempSync, rmSync } from "fs";
+import { tmpdir } from "os";
+import { basename, join, relative, resolve, sep } from "path";
 
 import type { Config } from "./config";
 import { CheckpointManager } from "./pipeline/checkpoint";
@@ -173,7 +174,10 @@ function summarizeRun(
 
   const stageResults = checkpoint.getStageResultsForRun(runId);
   const clipProgress = checkpoint.getClipProgressEntries(runId);
-  const clipStageResult = checkpoint.getStageResult<ClipCandidate[]>(runId, PipelineStage.IDENTIFY_CLIPS);
+  const clipStageResult = checkpoint.getStageResult<ClipCandidate[]>(
+    runId,
+    PipelineStage.IDENTIFY_CLIPS,
+  );
   const clipCandidates = Array.isArray(clipStageResult?.data) ? clipStageResult.data : [];
   const clipMap = new Map(clipCandidates.map((clip) => [clip.id, clip]));
   const derived = deriveRunState({
@@ -182,10 +186,49 @@ function summarizeRun(
     clipProgress,
     clipCandidates,
   });
-  const outputs = clipProgress
+  const outputs = getRunOutputs(runId, checkpoint, config, clipProgress, clipMap);
+
+  return {
+    ...run,
+    status: derived.status,
+    currentStage: derived.currentStage,
+    persistedStatus: derived.persistedStatus,
+    stages: stageResults,
+    clips: clipProgress.map((entry) => ({
+      ...entry,
+      title: clipMap.get(entry.clipId)?.title ?? entry.clipId,
+    })),
+    outputs,
+  };
+}
+
+function getRunOutputs(
+  runId: string,
+  checkpoint: CheckpointManager,
+  config: Config,
+  clipProgress?: ReturnType<CheckpointManager["getClipProgressEntries"]>,
+  clipMap?: Map<string, ClipCandidate>,
+): Array<{ clipId: string; title: string; path: string; url: string | null }> {
+  const run = checkpoint.getRunInfo(runId);
+  if (!run) {
+    throw new Error(`Run not found: ${runId}`);
+  }
+
+  const progressEntries = clipProgress ?? checkpoint.getClipProgressEntries(runId);
+  let clipsById = clipMap;
+  if (!clipsById) {
+    const clipStageResult = checkpoint.getStageResult<ClipCandidate[]>(
+      runId,
+      PipelineStage.IDENTIFY_CLIPS,
+    );
+    const clipCandidates = Array.isArray(clipStageResult?.data) ? clipStageResult.data : [];
+    clipsById = new Map(clipCandidates.map((clip) => [clip.id, clip]));
+  }
+
+  return progressEntries
     .filter((entry) => Boolean(entry.artifactPaths.finalReelPath))
     .map((entry) => {
-      const clip = clipMap.get(entry.clipId);
+      const clip = clipsById.get(entry.clipId);
       const finalPath = clip
         ? migrateLegacyFinalReelPath({
             runId,
@@ -202,18 +245,59 @@ function summarizeRun(
         url: buildMediaUrl(finalPath, config),
       };
     });
+}
+
+async function buildRunArchive(
+  runId: string,
+  checkpoint: CheckpointManager,
+  config: Config,
+): Promise<{ filePath: string; fileName: string }> {
+  const run = checkpoint.getRunInfo(runId);
+  if (!run) {
+    throw new Error(`Run not found: ${runId}`);
+  }
+
+  const outputs = getRunOutputs(runId, checkpoint, config).filter((output) => existsSync(output.path));
+  if (outputs.length === 0) {
+    throw new Error("This run has no completed MP4 clips to archive yet.");
+  }
+
+  const archiveDir = mkdtempSync(join(tmpdir(), "jiang-clips-archive-"));
+  const archiveName = sanitizeFileName(`${run.videoTitle || run.videoId || run.id}.zip`);
+  const archivePath = join(archiveDir, archiveName);
+  const pairs = outputs.map((output) => `${output.path}::${basename(output.path)}`);
+  const script = `
+import sys
+import zipfile
+
+archive_path = sys.argv[1]
+pairs = sys.argv[2:]
+
+with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as bundle:
+    for pair in pairs:
+        source, arcname = pair.split("::", 1)
+        bundle.write(source, arcname=arcname)
+`;
+
+  const proc = Bun.spawn(["python3", "-c", script, archivePath, ...pairs], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const stderr = await new Response(proc.stderr).text();
+  const exitCode = await proc.exited;
+
+  if (exitCode !== 0 || !existsSync(archivePath)) {
+    rmSync(archiveDir, { recursive: true, force: true });
+    throw new Error(`Failed to build run archive: ${stderr || `python exited with code ${exitCode}`}`);
+  }
+
+  setTimeout(() => {
+    rmSync(archiveDir, { recursive: true, force: true });
+  }, 5 * 60 * 1000);
 
   return {
-    ...run,
-    status: derived.status,
-    currentStage: derived.currentStage,
-    persistedStatus: derived.persistedStatus,
-    stages: stageResults,
-    clips: clipProgress.map((entry) => ({
-      ...entry,
-      title: clipMap.get(entry.clipId)?.title ?? entry.clipId,
-    })),
-    outputs,
+    filePath: archivePath,
+    fileName: archiveName,
   };
 }
 
@@ -278,6 +362,19 @@ export function startApiServer(config: Config): void {
         }
 
         if (request.method === "GET" && path.startsWith("/api/jobs/")) {
+          if (path.endsWith("/download")) {
+            const runId = path.replace("/api/jobs/", "").replace("/download", "");
+            const archive = await buildRunArchive(runId, checkpoint, config);
+
+            return new Response(Bun.file(archive.filePath), {
+              headers: {
+                "Access-Control-Allow-Origin": "*",
+                "Content-Disposition": `attachment; filename="${archive.fileName}"`,
+                "Content-Type": "application/zip",
+              },
+            });
+          }
+
           if (path.endsWith("/cleanup")) {
             return textError("Not found", 404);
           }

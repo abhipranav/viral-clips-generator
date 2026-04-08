@@ -60,6 +60,10 @@ export async function createRunFromYouTube(
   return await parseJson<LocalDownloadResponse>(response);
 }
 
-export function resolveMediaUrl(path: string): string {
+export function resolveApiUrl(path: string): string {
   return `${apiBaseUrl}${path}`;
+}
+
+export function resolveMediaUrl(path: string): string {
+  return resolveApiUrl(path);
 }
