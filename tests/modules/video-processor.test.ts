@@ -146,7 +146,7 @@ describe("VideoProcessor", () => {
     expect(info.height).toBe(1920);
   }, 60_000);
 
-  test("caption filters preserve alpha overlays instead of chroma-keying green", () => {
+  test("caption filters use chroma-key composition for caption overlays", () => {
     const vp = new VideoProcessor();
     const config = {
       openaiApiKey: "",
@@ -181,9 +181,7 @@ describe("VideoProcessor", () => {
     const splitFilter = (vp as any).buildSplitScreenFilter(config, config.clipSpeed, true);
     const singleFilter = (vp as any).buildSingleReelFilter(config, config.clipSpeed, true);
 
-    expect(splitFilter).not.toContain("colorkey");
-    expect(singleFilter).not.toContain("colorkey");
-    expect(splitFilter).toContain("format=rgba[captions]");
-    expect(singleFilter).toContain("format=rgba[captions]");
+    expect(splitFilter).toContain("colorkey=0x00FF00:0.3:0.1");
+    expect(singleFilter).toContain("colorkey=0x00FF00:0.3:0.1");
   });
 });

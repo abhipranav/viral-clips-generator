@@ -267,7 +267,7 @@ export class VideoProcessor {
 
     if (hasCaptions) {
       filterComplex +=
-        `;[2:v]fps=30,scale=${w}:${h}:force_original_aspect_ratio=disable,format=rgba[captions];` +
+        `;[2:v]fps=30,scale=${w}:${h},colorkey=0x00FF00:0.3:0.1[captions];` +
         `[bg][captions]overlay=0:0:format=auto[out]`;
     } else {
       filterComplex += `;[bg]copy[out]`;
@@ -286,7 +286,7 @@ export class VideoProcessor {
 
     if (hasCaptions) {
       filterComplex +=
-        `;[1:v]fps=30,scale=${w}:${h}:force_original_aspect_ratio=disable,format=rgba[captions];` +
+        `;[1:v]fps=30,scale=${w}:${h},colorkey=0x00FF00:0.3:0.1[captions];` +
         `[base][captions]overlay=0:0:format=auto[out]`;
     } else {
       filterComplex += `;[base]copy[out]`;
