@@ -1,20 +1,22 @@
-import { GoogleGenAI } from "@google/genai";
-
 import { createLogger } from "../utils/logger";
 import type { Config } from "../config";
-import type { Transcript, VideoMetadata, ClipCandidate } from "../pipeline/types";
+import type { ClipCandidate, Transcript, VideoMetadata } from "../pipeline/types";
 
 const log = createLogger("clip-identifier");
-const MAX_GEMINI_ATTEMPTS = 4;
+const OPENAI_API_URL = "https://api.openai.com/v1/responses";
+const OPENAI_CLIP_MODEL = "gpt-5-mini";
+const MAX_OPENAI_ATTEMPTS = 4;
 const BASE_RETRY_DELAY_MS = 2000;
 
 const CLIP_SCHEMA = {
   type: "object" as const,
+  additionalProperties: false,
   properties: {
     clips: {
       type: "array" as const,
       items: {
         type: "object" as const,
+        additionalProperties: false,
         properties: {
           title: { type: "string" as const },
           hookLine: { type: "string" as const },
@@ -31,15 +33,40 @@ const CLIP_SCHEMA = {
   required: ["clips"],
 };
 
+interface OpenAiErrorResponse {
+  error?: {
+    message?: string;
+  };
+}
+
+interface OpenAiTextContent {
+  type: string;
+  text?: string;
+  refusal?: string;
+}
+
+interface OpenAiOutputItem {
+  type: string;
+  content?: OpenAiTextContent[];
+}
+
+interface OpenAiResponseBody extends OpenAiErrorResponse {
+  output_text?: string;
+  output?: OpenAiOutputItem[];
+  incomplete_details?: {
+    reason?: string;
+  } | null;
+}
+
 export class ClipIdentifier {
-  private ai: GoogleGenAI;
+  private apiKey: string;
 
   constructor(config: Config) {
-    this.ai = new GoogleGenAI({ apiKey: config.geminiApiKey });
+    this.apiKey = config.openaiApiKey;
   }
 
   async identify(transcript: Transcript, metadata: VideoMetadata): Promise<ClipCandidate[]> {
-    log.info(`Analyzing transcript for clip-worthy segments...`);
+    log.info("Analyzing transcript for clip-worthy segments...");
 
     const formattedTranscript = transcript.segments
       .map((s) => `[${s.start.toFixed(1)}s - ${s.end.toFixed(1)}s] ${s.text}`)
@@ -71,9 +98,7 @@ ${formattedTranscript}
 
 Return clips sorted by viralScore (highest first). Aim for 5-15 clips depending on video length.`;
 
-    const response = await this.generateContentWithRetry(prompt);
-
-    const text = response.text ?? "";
+    const text = await this.generateContentWithRetry(prompt);
     const parsed = JSON.parse(text) as {
       clips: Array<{
         title: string;
@@ -87,7 +112,7 @@ Return clips sorted by viralScore (highest first). Aim for 5-15 clips depending 
     };
 
     log.info(
-      `Gemini returned ${parsed.clips.length} raw clips (video duration: ${metadata.duration}s)`,
+      `OpenAI ${OPENAI_CLIP_MODEL} returned ${parsed.clips.length} raw clips (video duration: ${metadata.duration}s)`,
     );
     for (const c of parsed.clips) {
       const dur = c.endTime - c.startTime;
@@ -124,47 +149,132 @@ Return clips sorted by viralScore (highest first). Aim for 5-15 clips depending 
     return candidates;
   }
 
-  private async generateContentWithRetry(prompt: string) {
+  private async generateContentWithRetry(prompt: string): Promise<string> {
     let lastError: unknown;
 
-    for (let attempt = 1; attempt <= MAX_GEMINI_ATTEMPTS; attempt++) {
+    for (let attempt = 1; attempt <= MAX_OPENAI_ATTEMPTS; attempt++) {
       try {
         if (attempt > 1) {
-          log.info(`Retrying Gemini clip identification (${attempt}/${MAX_GEMINI_ATTEMPTS})...`);
+          log.info(
+            `Retrying OpenAI clip identification with ${OPENAI_CLIP_MODEL} (${attempt}/${MAX_OPENAI_ATTEMPTS})...`,
+          );
         }
 
-        return await this.ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: prompt,
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: CLIP_SCHEMA,
+        const response = await fetch(OPENAI_API_URL, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            "Content-Type": "application/json",
           },
+          body: JSON.stringify({
+            model: OPENAI_CLIP_MODEL,
+            input: prompt,
+            text: {
+              format: {
+                type: "json_schema",
+                name: "clip_candidates",
+                strict: true,
+                schema: CLIP_SCHEMA,
+              },
+            },
+          }),
         });
+
+        const body = (await this.parseJsonResponse(response)) as OpenAiResponseBody;
+        if (!response.ok) {
+          const message =
+            body.error?.message || `OpenAI request failed with status ${response.status}`;
+          throw new OpenAiRequestError(message, response.status);
+        }
+
+        return this.extractJsonText(body);
       } catch (err) {
         lastError = err;
-        if (!isRetryableGeminiError(err) || attempt === MAX_GEMINI_ATTEMPTS) {
+        if (!isRetryableOpenAiError(err) || attempt === MAX_OPENAI_ATTEMPTS) {
           throw err;
         }
 
         const delayMs = BASE_RETRY_DELAY_MS * 2 ** (attempt - 1);
-        log.warn(`Gemini temporarily unavailable. Retrying in ${delayMs / 1000}s...`);
+        log.warn(`OpenAI temporarily unavailable. Retrying in ${delayMs / 1000}s...`);
         await Bun.sleep(delayMs);
       }
     }
 
-    throw lastError instanceof Error ? lastError : new Error(`Gemini request failed: ${lastError}`);
+    throw lastError instanceof Error ? lastError : new Error(`OpenAI request failed: ${lastError}`);
+  }
+
+  private async parseJsonResponse(response: Response): Promise<unknown> {
+    const raw = await response.text();
+    if (!raw.trim()) {
+      return {};
+    }
+
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return {
+        error: {
+          message: raw,
+        },
+      };
+    }
+  }
+
+  private extractJsonText(body: OpenAiResponseBody): string {
+    if (typeof body.output_text === "string" && body.output_text.trim()) {
+      return body.output_text;
+    }
+
+    const text = body.output
+      ?.flatMap((item) => item.content ?? [])
+      .map((content) => {
+        if (content.type === "refusal" && content.refusal) {
+          throw new Error(`OpenAI refused clip identification: ${content.refusal}`);
+        }
+
+        return content.type === "output_text" ? (content.text ?? "") : "";
+      })
+      .join("")
+      .trim();
+
+    if (text) {
+      return text;
+    }
+
+    if (body.incomplete_details?.reason) {
+      throw new Error(`OpenAI returned an incomplete response: ${body.incomplete_details.reason}`);
+    }
+
+    throw new Error("OpenAI returned no structured output for clip identification.");
   }
 }
 
-function isRetryableGeminiError(err: unknown): boolean {
+class OpenAiRequestError extends Error {
+  status?: number;
+
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = "OpenAiRequestError";
+    this.status = status;
+  }
+}
+
+function isRetryableOpenAiError(err: unknown): boolean {
+  if (err instanceof OpenAiRequestError && err.status !== undefined) {
+    return err.status === 408 || err.status === 409 || err.status === 429 || err.status >= 500;
+  }
+
   const message =
     err instanceof Error ? err.message : typeof err === "string" ? err : JSON.stringify(err);
 
   return (
-    message.includes("\"code\":503") ||
-    message.includes("\"status\":\"UNAVAILABLE\"") ||
-    message.includes("high demand") ||
-    message.includes("temporarily unavailable")
+    message.includes("429") ||
+    message.includes("500") ||
+    message.includes("502") ||
+    message.includes("503") ||
+    message.includes("504") ||
+    message.includes("rate limit") ||
+    message.includes("temporarily unavailable") ||
+    message.includes("overloaded")
   );
 }

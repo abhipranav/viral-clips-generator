@@ -23,7 +23,7 @@ program
   .description("Run the full pipeline for a YouTube video")
   .argument("<url>", "YouTube video URL")
   .action(async (url: string) => {
-    const config = loadConfig({ requireGeminiApiKey: true });
+    const config = loadConfig({ requireOpenAiApiKey: true });
     const checkpoint = new CheckpointManager(config.paths.checkpointDb);
     const orchestrator = new PipelineOrchestrator(config, checkpoint);
 
@@ -45,7 +45,7 @@ program
   .argument("<file-path>", "Local video file path")
   .option("--title <title>", "Override the detected title")
   .action(async (filePath: string, opts: { title?: string }) => {
-    const config = loadConfig({ requireGeminiApiKey: true });
+    const config = loadConfig({ requireOpenAiApiKey: true });
     const checkpoint = new CheckpointManager(config.paths.checkpointDb);
     const orchestrator = new PipelineOrchestrator(config, checkpoint);
 
@@ -68,7 +68,7 @@ program
   .option("-l, --limit <n>", "Maximum videos to process", "10")
   .option("--skip-existing", "Skip already processed videos")
   .action(async (channelUrl: string, opts: { limit: string; skipExisting?: boolean }) => {
-    const config = loadConfig({ requireGeminiApiKey: true });
+    const config = loadConfig({ requireOpenAiApiKey: true });
     const checkpoint = new CheckpointManager(config.paths.checkpointDb);
     const downloader = new Downloader();
     const orchestrator = new PipelineOrchestrator(config, checkpoint);
@@ -106,7 +106,7 @@ program
   .command("api")
   .description("Start the Bun API for uploads, queueing, and dashboard integration")
   .action(async () => {
-    const config = loadConfig({ requireGeminiApiKey: true });
+    const config = loadConfig({ requireOpenAiApiKey: true });
     startApiServer(config);
   });
 
@@ -115,7 +115,7 @@ program
   .description("Resume a previously interrupted pipeline run")
   .argument("<run-id>", "Pipeline run ID")
   .action(async (runId: string) => {
-    const config = loadConfig({ requireGeminiApiKey: true });
+    const config = loadConfig({ requireOpenAiApiKey: true });
     const checkpoint = new CheckpointManager(config.paths.checkpointDb);
     const orchestrator = new PipelineOrchestrator(config, checkpoint);
 
@@ -135,7 +135,7 @@ program
   .description("Show status of pipeline runs")
   .argument("[run-id]", "Optional specific run ID")
   .action(async (runId?: string) => {
-    const config = loadConfig({ requireGeminiApiKey: false });
+    const config = loadConfig({ requireOpenAiApiKey: false });
     const checkpoint = new CheckpointManager(config.paths.checkpointDb);
 
     if (runId) {
@@ -202,7 +202,7 @@ program
   .argument("<run-id>", "Pipeline run ID")
   .option("--all", "Remove all artifacts including final output")
   .action(async (runId: string, opts: { all?: boolean }) => {
-    const config = loadConfig({ requireGeminiApiKey: false });
+    const config = loadConfig({ requireOpenAiApiKey: false });
     cleanRunArtifacts(config.paths.data, runId, !opts.all);
     log.info(`Cleaned artifacts for run: ${runId}`);
   });

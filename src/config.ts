@@ -18,7 +18,7 @@ function parseBooleanEnv(value: string | undefined): boolean | undefined {
 }
 
 const configSchema = z.object({
-  geminiApiKey: z.string().default(""),
+  openaiApiKey: z.string().default(""),
   whisperModel: z.enum(["tiny", "base", "small", "medium", "large"]).default("tiny"),
   maxParallelClips: z.coerce.number().int().min(1).max(10).default(1),
   silenceThresholdDb: z.coerce.number().default(-35),
@@ -51,9 +51,9 @@ const configSchema = z.object({
 
 export type Config = z.infer<typeof configSchema>;
 
-export function loadConfig(options?: { requireGeminiApiKey?: boolean }): Config {
+export function loadConfig(options?: { requireOpenAiApiKey?: boolean }): Config {
   const config = configSchema.parse({
-    geminiApiKey: Bun.env.GEMINI_API_KEY,
+    openaiApiKey: Bun.env.OPENAI_API_KEY,
     whisperModel: Bun.env.WHISPER_MODEL,
     maxParallelClips: Bun.env.MAX_PARALLEL_CLIPS,
     silenceThresholdDb: Bun.env.SILENCE_THRESHOLD_DB,
@@ -82,8 +82,8 @@ export function loadConfig(options?: { requireGeminiApiKey?: boolean }): Config 
     },
   });
 
-  if (options?.requireGeminiApiKey !== false && !config.geminiApiKey) {
-    throw new Error("GEMINI_API_KEY is required for pipeline execution.");
+  if (options?.requireOpenAiApiKey !== false && !config.openaiApiKey) {
+    throw new Error("OPENAI_API_KEY is required for pipeline execution.");
   }
 
   return config;
