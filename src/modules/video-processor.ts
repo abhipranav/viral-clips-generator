@@ -1,6 +1,7 @@
 import { createLogger } from "../utils/logger";
 import {
   runFfmpeg,
+  runFfprobe,
   detectSilence,
   secondsToFfmpegTimestamp,
   getVideoDuration,
@@ -9,6 +10,7 @@ import { listFiles, randomItem, fileExists, ensureDir } from "../utils/fs";
 import type { Config } from "../config";
 import type { ClipCandidate } from "../pipeline/types";
 import { join, dirname } from "path";
+import { unlinkSync } from "fs";
 
 const log = createLogger("video-processor");
 
@@ -21,7 +23,7 @@ export class VideoProcessor {
   async extractClip(videoPath: string, clip: ClipCandidate, outputDir: string): Promise<string> {
     const outputPath = join(outputDir, `${clip.id}_raw.mp4`);
 
-    if (await fileExists(outputPath)) {
+    if (await this.canReuseExistingArtifact(outputPath, "extracted clip")) {
       log.info(`Clip already extracted: ${clip.title}`);
       return outputPath;
     }
@@ -56,7 +58,7 @@ export class VideoProcessor {
     outputPath: string,
     config: Config,
   ): Promise<{ path: string; speechRanges: SpeechRange[] | null }> {
-    if (await fileExists(outputPath)) {
+    if (await this.canReuseExistingArtifact(outputPath, "silence-removed clip")) {
       log.info("Silence-removed clip already exists");
       return { path: outputPath, speechRanges: null };
     }
@@ -145,7 +147,7 @@ export class VideoProcessor {
   ): Promise<string> {
     ensureDir(dirname(outputPath));
 
-    if (await fileExists(outputPath)) {
+    if (await this.canReuseExistingArtifact(outputPath, "final reel")) {
       log.info("Reel already composed");
       return outputPath;
     }
@@ -318,5 +320,29 @@ export class VideoProcessor {
     }
 
     return speech;
+  }
+
+  private async canReuseExistingArtifact(
+    filePath: string,
+    artifactLabel: string,
+  ): Promise<boolean> {
+    if (!(await fileExists(filePath))) {
+      return false;
+    }
+
+    try {
+      await runFfprobe(filePath);
+      return true;
+    } catch (err) {
+      log.warn(`Existing ${artifactLabel} is invalid, regenerating (${err})`);
+
+      try {
+        unlinkSync(filePath);
+      } catch (deleteErr) {
+        log.warn(`Failed to remove invalid ${artifactLabel} at ${filePath}: ${deleteErr}`);
+      }
+
+      return false;
+    }
   }
 }

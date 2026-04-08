@@ -72,6 +72,31 @@ describe("VideoProcessor", () => {
     expect(info.duration).toBeLessThan(12);
   }, 30_000);
 
+  test("extractClip regenerates an invalid cached clip", async () => {
+    await createTestVideo();
+    const vp = new VideoProcessor();
+    const clip = {
+      id: "test-clip-invalid",
+      title: "Invalid Cached Clip",
+      hookLine: "hook",
+      startTime: 1,
+      endTime: 6,
+      duration: 5,
+      reasoning: "test",
+      viralScore: 8,
+      tags: ["test"],
+    };
+
+    const outputPath = join(TMP, "clips", `${clip.id}_raw.mp4`);
+    await Bun.write(outputPath, "not a real mp4");
+
+    const result = await vp.extractClip(TEST_VIDEO, clip, join(TMP, "clips"));
+    const info = await runFfprobe(result);
+
+    expect(result).toBe(outputPath);
+    expect(info.duration).toBeGreaterThan(3);
+  }, 30_000);
+
   test("removeSilence produces shorter output when silence exists", async () => {
     await createTestVideo();
     const vp = new VideoProcessor();
@@ -142,6 +167,49 @@ describe("VideoProcessor", () => {
     expect(existsSync(result)).toBe(true);
 
     const info = await runFfprobe(result);
+    expect(info.width).toBe(1080);
+    expect(info.height).toBe(1920);
+  }, 60_000);
+
+  test("composeReel regenerates an invalid cached output file", async () => {
+    await createTestVideo();
+    const vp = new VideoProcessor();
+    const config = {
+      openaiApiKey: "",
+      whisperModel: "base" as const,
+      maxParallelClips: 3,
+      silenceThresholdDb: -35,
+      silenceMinDuration: 0.8,
+      outputWidth: 1080,
+      outputHeight: 1920,
+      clipSpeed: 1.2,
+      maxClips: 5,
+      preferYouTubeTranscripts: true,
+      captionAnimate: true,
+      generateCaptions: false,
+      removeSilence: true,
+      whisperCliBin: "whisper-cli",
+      whisperCliModelPath: "",
+      serverHost: "0.0.0.0",
+      serverPort: 3001,
+      jobConcurrency: 1,
+      maxUploadSizeMb: 1024,
+      paths: {
+        data: TMP,
+        output: TMP,
+        assets: TMP,
+        subwaySurfers: join(TMP, "no-surfers"),
+        uploads: join(TMP, "uploads"),
+        checkpointDb: join(TMP, "test.db"),
+      },
+    };
+
+    const outputPath = join(TMP, "reel-invalid.mp4");
+    await Bun.write(outputPath, "corrupt reel");
+
+    const result = await vp.composeReel(TEST_VIDEO, config as never, outputPath);
+    const info = await runFfprobe(result);
+
     expect(info.width).toBe(1080);
     expect(info.height).toBe(1920);
   }, 60_000);

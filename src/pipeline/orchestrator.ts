@@ -278,7 +278,13 @@ export class PipelineOrchestrator {
 
         try {
           log.info(`[${index + 1}/${clips.length}] Processing: "${clip.title}"`);
-          await this.processOneClip(runId, clip, index, metadata, dir, outputDir, config);
+          try {
+            await this.processOneClip(runId, clip, index, metadata, dir, outputDir, config);
+          } catch (err) {
+            throw new Error(
+              `Clip "${clip.title}" (${clip.id}) failed: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
           log.info(`[${index + 1}/${clips.length}] Completed: "${clip.title}"`);
         } finally {
           semaphore.release();
