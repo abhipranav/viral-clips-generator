@@ -15,6 +15,7 @@ import {
   createRunFromYouTube,
   fetchDashboard,
   fetchRun,
+  resolveApiUrl,
   resolveMediaUrl,
 } from "../lib/api";
 import type { QueueStats, RunRecord } from "../lib/types";
@@ -95,7 +96,7 @@ export default function HomePage() {
   const [localMessage, setLocalMessage] = useState<string | null>(null);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [appSettings, setAppSettings] = useState<AppSettings>(appSettingsDefaults);
-  const [expandedClipId, setExpandedClipId] = useState<string | null>(null);
+  const [expandedClipIds, setExpandedClipIds] = useState<string[]>([]);
   const deferredRuns = useDeferredValue(runs);
 
   useEffect(() => {
@@ -205,14 +206,37 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!selectedRun) {
-      setExpandedClipId(null);
+      setExpandedClipIds([]);
       return;
     }
 
-    if (expandedClipId && !selectedRun.outputs.some((output) => output.clipId === expandedClipId)) {
-      setExpandedClipId(null);
-    }
-  }, [expandedClipId, selectedRun]);
+    setExpandedClipIds((current) =>
+      current.filter((clipId) => selectedRun.outputs.some((output) => output.clipId === clipId)),
+    );
+  }, [selectedRun]);
+
+  const readyOutputCount = selectedRun?.outputs.length ?? 0;
+  const totalClipCount = selectedRun?.clips.length ?? 0;
+  const visibleOutputCount = Math.min(readyOutputCount, appSettings.maxVisiblePreviewCards);
+  const hiddenOutputCount = Math.max(0, readyOutputCount - visibleOutputCount);
+  const pendingOutputCount = Math.max(0, totalClipCount - readyOutputCount);
+  const visibleOutputs = selectedRun?.outputs.slice(0, appSettings.maxVisiblePreviewCards) ?? [];
+  const allVisibleExpanded =
+    visibleOutputs.length > 0 && visibleOutputs.every((output) => expandedClipIds.includes(output.clipId));
+
+  function toggleClipExpansion(clipId: string): void {
+    setExpandedClipIds((current) =>
+      current.includes(clipId) ? current.filter((id) => id !== clipId) : [...current, clipId],
+    );
+  }
+
+  function expandAllVisibleClips(): void {
+    setExpandedClipIds(visibleOutputs.map((output) => output.clipId));
+  }
+
+  function collapseAllVisibleClips(): void {
+    setExpandedClipIds([]);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -655,17 +679,55 @@ export default function HomePage() {
               </article>
 
               <article className="detail-block">
-                <h3>Generated Clips</h3>
+                <div className="detail-block-head">
+                  <div>
+                    <h3>Generated Clips</h3>
+                    <p className="supporting-copy detail-subcopy">
+                      {readyOutputCount} of {totalClipCount || readyOutputCount} clips are fully rendered and
+                      downloadable.
+                      {pendingOutputCount > 0 ? ` ${pendingOutputCount} still rendering.` : " Everything is ready."}
+                      {hiddenOutputCount > 0
+                        ? ` Showing ${visibleOutputCount} here because of your preview-card setting.`
+                        : ""}
+                    </p>
+                  </div>
+                  {selectedRun.outputs.length > 0 ? (
+                    <div className="detail-actions">
+                      <a
+                        className="secondary-button"
+                        href={resolveApiUrl(`/api/jobs/${selectedRun.id}/download`)}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        Download All Ready MP4s
+                      </a>
+                      <button
+                        className="secondary-button"
+                        onClick={() => {
+                          if (allVisibleExpanded) {
+                            collapseAllVisibleClips();
+                            return;
+                          }
+
+                          expandAllVisibleClips();
+                        }}
+                        type="button"
+                      >
+                        {allVisibleExpanded ? "Collapse All Visible" : "Expand All Visible"}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
                 <div className="clip-list">
                   {selectedRun.outputs.length > 0 ? (
                     selectedRun.outputs.slice(0, appSettings.maxVisiblePreviewCards).map((output) => (
                       <div
                         key={output.clipId}
-                        className={`clip-card ${expandedClipId === output.clipId ? "clip-card-expanded" : "clip-card-collapsed"}`}
+                        className={`clip-card ${expandedClipIds.includes(output.clipId) ? "clip-card-expanded" : "clip-card-collapsed"}`}
                       >
                         <button
                           aria-controls={`clip-player-${output.clipId}`}
-                          aria-expanded={expandedClipId === output.clipId}
+                          aria-expanded={expandedClipIds.includes(output.clipId)}
                           className="clip-toggle"
                           disabled={!output.url}
                           onClick={() => {
@@ -673,14 +735,12 @@ export default function HomePage() {
                               return;
                             }
 
-                            setExpandedClipId((current) =>
-                              current === output.clipId ? null : output.clipId,
-                            );
+                            toggleClipExpansion(output.clipId);
                           }}
                           type="button"
                         >
                           <span className="clip-toggle-icon" aria-hidden="true">
-                            {expandedClipId === output.clipId ? "-" : "+"}
+                            {expandedClipIds.includes(output.clipId) ? "-" : "+"}
                           </span>
                           <span className="clip-toggle-copy">
                             <strong>{output.title}</strong>
@@ -692,7 +752,7 @@ export default function HomePage() {
                           <p className="supporting-copy">This clip is still rendering and is not playable yet.</p>
                         ) : null}
 
-                        {output.url && expandedClipId === output.clipId ? (
+                        {output.url && expandedClipIds.includes(output.clipId) ? (
                           <>
                             <video
                               controls
@@ -715,7 +775,7 @@ export default function HomePage() {
                     ))
                   ) : (
                     <p className="supporting-copy">
-                      Final rendered reels will appear here as soon as the compose stage finishes.
+                      Final rendered reels will appear here as soon as each clip finishes the compose stage.
                     </p>
                   )}
                 </div>

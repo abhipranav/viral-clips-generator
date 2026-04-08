@@ -1,15 +1,23 @@
 :root {
-  --bg: #07131d;
-  --bg-elevated: rgba(9, 26, 41, 0.82);
-  --bg-soft: rgba(255, 255, 255, 0.06);
-  --border: rgba(255, 255, 255, 0.12);
-  --text: #f5f0e8;
-  --text-dim: #aab8c3;
-  --accent: #ff8f3c;
-  --accent-soft: #ffd166;
-  --success: #51d88a;
-  --danger: #ff6b6b;
-  --shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+  --font-body:
+    "Avenir Next", "Manrope", "Segoe UI", "Helvetica Neue", "Inter", sans-serif;
+  --font-display:
+    "Iowan Old Style", "Fraunces", "Palatino Linotype", "Book Antiqua", "Georgia", serif;
+  --bg: #08121d;
+  --bg-elevated: rgba(11, 24, 38, 0.86);
+  --bg-soft: rgba(255, 255, 255, 0.055);
+  --bg-card-strong: rgba(14, 31, 47, 0.92);
+  --border: rgba(195, 219, 237, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --text: #f6f1e8;
+  --text-dim: #9eb0be;
+  --text-soft: #cbd8e1;
+  --accent: #ff9a4a;
+  --accent-soft: #ffd37a;
+  --accent-cool: #7ed7c1;
+  --success: #67d79a;
+  --danger: #ff7d73;
+  --shadow: 0 28px 90px rgba(0, 0, 0, 0.34);
   --radius-xl: 28px;
   --radius-lg: 20px;
   --radius-md: 14px;
@@ -21,9 +29,10 @@
 
 html {
   background:
-    radial-gradient(circle at top left, rgba(255, 143, 60, 0.22), transparent 32%),
-    radial-gradient(circle at bottom right, rgba(81, 216, 138, 0.14), transparent 28%),
-    linear-gradient(160deg, #07131d 0%, #0d2131 55%, #102736 100%);
+    radial-gradient(circle at top left, rgba(255, 154, 74, 0.28), transparent 30%),
+    radial-gradient(circle at 85% 18%, rgba(126, 215, 193, 0.13), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(96, 127, 255, 0.12), transparent 26%),
+    linear-gradient(160deg, #08121d 0%, #0d1c2c 52%, #112434 100%);
   min-height: 100%;
 }
 
@@ -31,7 +40,8 @@ body {
   margin: 0;
   min-height: 100vh;
   color: var(--text);
-  font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+  font-family: var(--font-body), "Segoe UI", sans-serif;
+  letter-spacing: -0.01em;
 }
 
 .global-nav-wrap {
@@ -46,20 +56,23 @@ body {
 .global-nav {
   width: min(1400px, calc(100vw - 48px));
   margin: 0 auto;
-  padding: 12px 16px;
+  padding: 12px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 999px;
-  background: rgba(9, 26, 41, 0.72);
+  background:
+    linear-gradient(180deg, rgba(19, 40, 60, 0.88), rgba(10, 24, 38, 0.8));
 }
 
 .brand-mark {
   color: var(--text);
   text-decoration: none;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-family: var(--font-display), "Iowan Old Style", serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 .global-nav-links {
@@ -77,8 +90,8 @@ body {
 
 .global-nav-link:hover {
   color: var(--text);
-  border-color: rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 211, 122, 0.35);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 button,
@@ -103,7 +116,7 @@ input {
 .queue-card,
 .panel {
   background: var(--bg-elevated);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow);
   backdrop-filter: blur(16px);
@@ -111,15 +124,18 @@ input {
 
 .hero-copy {
   padding: 36px;
+  background:
+    linear-gradient(160deg, rgba(15, 32, 49, 0.94), rgba(11, 24, 38, 0.82)),
+    radial-gradient(circle at top right, rgba(255, 154, 74, 0.1), transparent 30%);
 }
 
 .hero-copy h1 {
   margin: 8px 0 12px;
   max-width: 13ch;
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-family: var(--font-display), "Iowan Old Style", serif;
   font-size: clamp(2.6rem, 6vw, 5rem);
-  line-height: 0.92;
-  letter-spacing: -0.05em;
+  line-height: 0.9;
+  letter-spacing: -0.06em;
 }
 
 .hero-text,
@@ -135,7 +151,8 @@ input {
   margin: 0;
   color: var(--accent-soft);
   font-size: 0.75rem;
-  letter-spacing: 0.24em;
+  font-weight: 700;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
 }
 
@@ -144,11 +161,16 @@ input {
   display: grid;
   gap: 10px;
   align-content: start;
+  background:
+    linear-gradient(180deg, rgba(13, 30, 46, 0.94), rgba(9, 23, 36, 0.9)),
+    radial-gradient(circle at top right, rgba(126, 215, 193, 0.1), transparent 34%);
 }
 
 .queue-card strong {
+  font-family: var(--font-display), "Iowan Old Style", serif;
   font-size: 4rem;
-  line-height: 1;
+  line-height: 0.94;
+  letter-spacing: -0.05em;
 }
 
 .queue-grid {
@@ -163,7 +185,7 @@ input {
 .run-card,
 .clip-card,
 .empty-state {
-  background: var(--bg-soft);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.035));
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-md);
 }
@@ -204,6 +226,9 @@ input {
 .section-header h3,
 .detail-block h3 {
   margin: 6px 0 0;
+  font-family: var(--font-display), "Iowan Old Style", serif;
+  font-weight: 600;
+  letter-spacing: -0.03em;
 }
 
 .pill {
@@ -211,9 +236,10 @@ input {
   align-items: center;
   padding: 8px 12px;
   border-radius: 999px;
-  background: rgba(255, 143, 60, 0.14);
+  background: rgba(255, 154, 74, 0.16);
   color: var(--accent-soft);
   font-size: 0.85rem;
+  border: 1px solid rgba(255, 211, 122, 0.14);
 }
 
 .pill-muted {
@@ -244,11 +270,21 @@ input {
 .field input[type="url"],
 .select-input {
   width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.11);
   border-radius: 14px;
-  background: rgba(4, 11, 17, 0.65);
+  background: rgba(5, 12, 19, 0.7);
   color: var(--text);
   padding: 14px 16px;
+}
+
+.field input[type="file"]:focus,
+.field input[type="text"]:focus,
+.field input[type="number"]:focus,
+.field input[type="url"]:focus,
+.select-input:focus {
+  outline: 2px solid rgba(255, 154, 74, 0.28);
+  outline-offset: 2px;
+  border-color: rgba(255, 211, 122, 0.28);
 }
 
 .select-input {
@@ -267,7 +303,7 @@ input {
   padding: 12px 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.035);
 }
 
 .primary-button {
@@ -275,7 +311,7 @@ input {
   border: 0;
   border-radius: 16px;
   padding: 16px 18px;
-  background: linear-gradient(135deg, var(--accent), #ffb347);
+  background: linear-gradient(135deg, var(--accent), #ffbe63);
   color: #1a130b;
   font-weight: 700;
   cursor: pointer;
@@ -289,8 +325,8 @@ input {
   align-items: center;
   justify-content: center;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.055);
   color: var(--text);
   text-decoration: none;
   padding: 12px 14px;
@@ -321,6 +357,10 @@ input {
 .message {
   margin: 12px 0 0;
   color: var(--accent-soft);
+  background: rgba(255, 211, 122, 0.08);
+  border: 1px solid rgba(255, 211, 122, 0.12);
+  border-radius: 12px;
+  padding: 12px 14px;
 }
 
 .source-section {
@@ -354,11 +394,31 @@ input {
   gap: 12px;
 }
 
+.detail-block-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.detail-subcopy {
+  margin: 8px 0 0;
+  max-width: 60ch;
+}
+
 .run-card {
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: inherit;
-  padding: 14px 16px;
+  padding: 15px 16px;
   cursor: pointer;
   text-align: left;
   display: flex;
@@ -372,9 +432,9 @@ input {
 
 .run-card:hover,
 .run-card.active {
-  border-color: rgba(255, 209, 102, 0.45);
+  border-color: rgba(255, 211, 122, 0.42);
   transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.05));
 }
 
 .stage-row,
@@ -387,6 +447,7 @@ input {
   display: flex;
   justify-content: space-between;
   gap: 12px;
+  align-items: center;
 }
 
 .clip-card {
@@ -425,7 +486,7 @@ input {
   height: 28px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(7, 19, 29, 0.65);
+  background: rgba(8, 18, 29, 0.82);
   color: var(--accent-soft);
   display: inline-flex;
   align-items: center;
@@ -454,6 +515,7 @@ input {
   margin-top: 2px;
   border-radius: 14px;
   background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .download-link {
@@ -470,7 +532,7 @@ input {
   margin-top: 8px;
   padding: 8px 10px;
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.28);
+  background: rgba(0, 0, 0, 0.32);
   color: var(--text);
 }
 
@@ -624,5 +686,14 @@ input {
   .ideas-grid {
     grid-template-columns: 1fr;
     width: 100%;
+  }
+
+  .detail-block-head {
+    flex-direction: column;
+  }
+
+  .detail-actions {
+    width: 100%;
+    justify-content: stretch;
   }
 }
