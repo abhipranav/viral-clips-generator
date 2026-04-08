@@ -167,23 +167,8 @@ export class VideoProcessor {
 
     log.info(`Composing split-screen reel (${speed}x speed)...`);
 
-    const halfHeight = Math.floor(config.outputHeight / 2);
-    const w = config.outputWidth;
-    const h = config.outputHeight;
     const hasCaptions = captionOverlayPath && (await fileExists(captionOverlayPath));
-
-    let filterComplex =
-      `[0:v]fps=30,scale=${w}:${halfHeight}:force_original_aspect_ratio=increase,crop=${w}:${halfHeight}[top];` +
-      `[1:v]fps=30,setpts=PTS/${speed},scale=${w}:${halfHeight}:force_original_aspect_ratio=increase,crop=${w}:${halfHeight}[bottom];` +
-      `[1:a]atempo=${speed}[afast];` +
-      `[top][bottom]vstack=inputs=2[bg]`;
-
-    if (hasCaptions) {
-      filterComplex +=
-        `;[2:v]fps=30,scale=${w}:${h},colorkey=0x00FF00:0.3:0.1[captions];` + `[bg][captions]overlay=0:0:format=auto[out]`;
-    } else {
-      filterComplex += `;[bg]copy[out]`;
-    }
+    const filterComplex = this.buildSplitScreenFilter(config, speed, hasCaptions);
 
     const inputs = [
       "-ss",
@@ -233,21 +218,9 @@ export class VideoProcessor {
     outputPath: string,
     captionOverlayPath?: string | null,
   ): Promise<string> {
-    const w = config.outputWidth;
-    const h = config.outputHeight;
     const speed = config.clipSpeed;
     const hasCaptions = captionOverlayPath && (await fileExists(captionOverlayPath));
-
-    let filterComplex =
-      `[0:v]fps=30,setpts=PTS/${speed},scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h}[base];` +
-      `[0:a]atempo=${speed}[afast]`;
-
-    if (hasCaptions) {
-      filterComplex +=
-        `;[1:v]fps=30,scale=${w}:${h},colorkey=0x00FF00:0.3:0.1[captions];` + `[base][captions]overlay=0:0:format=auto[out]`;
-    } else {
-      filterComplex += `;[base]copy[out]`;
-    }
+    const filterComplex = this.buildSingleReelFilter(config, speed, hasCaptions);
 
     const inputs = ["-i", clipPath];
     if (hasCaptions) {
@@ -279,6 +252,47 @@ export class VideoProcessor {
     ]);
 
     return outputPath;
+  }
+
+  private buildSplitScreenFilter(config: Config, speed: number, hasCaptions: boolean): string {
+    const halfHeight = Math.floor(config.outputHeight / 2);
+    const w = config.outputWidth;
+    const h = config.outputHeight;
+
+    let filterComplex =
+      `[0:v]fps=30,scale=${w}:${halfHeight}:force_original_aspect_ratio=increase,crop=${w}:${halfHeight}[top];` +
+      `[1:v]fps=30,setpts=PTS/${speed},scale=${w}:${halfHeight}:force_original_aspect_ratio=increase,crop=${w}:${halfHeight}[bottom];` +
+      `[1:a]atempo=${speed}[afast];` +
+      `[top][bottom]vstack=inputs=2[bg]`;
+
+    if (hasCaptions) {
+      filterComplex +=
+        `;[2:v]fps=30,scale=${w}:${h}:force_original_aspect_ratio=disable,format=rgba[captions];` +
+        `[bg][captions]overlay=0:0:format=auto[out]`;
+    } else {
+      filterComplex += `;[bg]copy[out]`;
+    }
+
+    return filterComplex;
+  }
+
+  private buildSingleReelFilter(config: Config, speed: number, hasCaptions: boolean): string {
+    const w = config.outputWidth;
+    const h = config.outputHeight;
+
+    let filterComplex =
+      `[0:v]fps=30,setpts=PTS/${speed},scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h}[base];` +
+      `[0:a]atempo=${speed}[afast]`;
+
+    if (hasCaptions) {
+      filterComplex +=
+        `;[1:v]fps=30,scale=${w}:${h}:force_original_aspect_ratio=disable,format=rgba[captions];` +
+        `[base][captions]overlay=0:0:format=auto[out]`;
+    } else {
+      filterComplex += `;[base]copy[out]`;
+    }
+
+    return filterComplex;
   }
 
   private invertRanges(

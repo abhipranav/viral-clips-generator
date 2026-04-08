@@ -76,7 +76,7 @@ describe("VideoProcessor", () => {
     await createTestVideo();
     const vp = new VideoProcessor();
     const config = {
-      geminiApiKey: "",
+      openaiApiKey: "",
       whisperModel: "base" as const,
       maxParallelClips: 3,
       silenceThresholdDb: -30,
@@ -96,10 +96,10 @@ describe("VideoProcessor", () => {
 
     const outputPath = join(TMP, "desilenced.mp4");
     const result = await vp.removeSilence(TEST_VIDEO, outputPath, config);
-    expect(existsSync(result)).toBe(true);
+    expect(existsSync(result.path)).toBe(true);
 
     const originalInfo = await runFfprobe(TEST_VIDEO);
-    const cleanInfo = await runFfprobe(result);
+    const cleanInfo = await runFfprobe(result.path);
     // With silence removed, output should be shorter
     expect(cleanInfo.duration).toBeLessThanOrEqual(originalInfo.duration);
   }, 30_000);
@@ -108,30 +108,82 @@ describe("VideoProcessor", () => {
     await createTestVideo();
     const vp = new VideoProcessor();
     const config = {
-      geminiApiKey: "",
+      openaiApiKey: "",
       whisperModel: "base" as const,
       maxParallelClips: 3,
       silenceThresholdDb: -35,
       silenceMinDuration: 0.8,
       outputWidth: 1080,
       outputHeight: 1920,
+      clipSpeed: 1.2,
+      maxClips: 5,
       preferYouTubeTranscripts: true,
       captionAnimate: true,
+      generateCaptions: false,
+      removeSilence: true,
+      whisperCliBin: "whisper-cli",
+      whisperCliModelPath: "",
+      serverHost: "0.0.0.0",
+      serverPort: 3001,
+      jobConcurrency: 1,
+      maxUploadSizeMb: 1024,
       paths: {
         data: TMP,
         output: TMP,
         assets: TMP,
         subwaySurfers: join(TMP, "no-surfers"),
+        uploads: join(TMP, "uploads"),
         checkpointDb: join(TMP, "test.db"),
       },
     };
 
     const outputPath = join(TMP, "reel.mp4");
-    const result = await vp.composeReel(TEST_VIDEO, null, config, outputPath);
+    const result = await vp.composeReel(TEST_VIDEO, config as never, outputPath);
     expect(existsSync(result)).toBe(true);
 
     const info = await runFfprobe(result);
     expect(info.width).toBe(1080);
     expect(info.height).toBe(1920);
   }, 60_000);
+
+  test("caption filters preserve alpha overlays instead of chroma-keying green", () => {
+    const vp = new VideoProcessor();
+    const config = {
+      openaiApiKey: "",
+      whisperModel: "base" as const,
+      maxParallelClips: 3,
+      silenceThresholdDb: -35,
+      silenceMinDuration: 0.8,
+      outputWidth: 1080,
+      outputHeight: 1920,
+      clipSpeed: 1.2,
+      maxClips: 5,
+      preferYouTubeTranscripts: true,
+      captionAnimate: true,
+      generateCaptions: true,
+      removeSilence: true,
+      whisperCliBin: "whisper-cli",
+      whisperCliModelPath: "",
+      serverHost: "0.0.0.0",
+      serverPort: 3001,
+      jobConcurrency: 1,
+      maxUploadSizeMb: 1024,
+      paths: {
+        data: TMP,
+        output: TMP,
+        assets: TMP,
+        subwaySurfers: join(TMP, "no-surfers"),
+        uploads: join(TMP, "uploads"),
+        checkpointDb: join(TMP, "test.db"),
+      },
+    };
+
+    const splitFilter = (vp as any).buildSplitScreenFilter(config, config.clipSpeed, true);
+    const singleFilter = (vp as any).buildSingleReelFilter(config, config.clipSpeed, true);
+
+    expect(splitFilter).not.toContain("colorkey");
+    expect(singleFilter).not.toContain("colorkey");
+    expect(splitFilter).toContain("format=rgba[captions]");
+    expect(singleFilter).toContain("format=rgba[captions]");
+  });
 });

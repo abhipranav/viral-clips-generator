@@ -35,13 +35,14 @@ const CaptionBox: React.FC<{ group: CaptionGroup; frame: number }> = ({ group, f
   return (
     <div
       style={{
-        background: "#000000",
-        padding: "12px 20px",
-        borderRadius: 8,
+        background: "rgba(0, 0, 0, 0.7)",
+        padding: "14px 24px",
+        borderRadius: 16,
         display: "inline-flex",
         flexDirection: "column",
         alignItems: "center",
         gap: 8,
+        maxWidth: "100%",
       }}
     >
       <div style={{ display: "flex", justifyContent: "center" }}>{line1.map(renderWord)}</div>
@@ -56,6 +57,7 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({ groups, width, h
   const frame = useCurrentFrame();
 
   const activeGroup = groups.find((g) => frame >= g.startFrame && frame < g.endFrame);
+  const bottomPadding = Math.round(height * 0.14);
 
   return (
     <div
@@ -64,14 +66,16 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({ groups, width, h
         height,
         display: "flex",
         alignItems: "center",
-        justifyContent: "center",
+        justifyContent: "flex-end",
         fontFamily: "Arial, Helvetica, sans-serif",
         fontWeight: 800,
         fontSize: FONT_SIZE,
         position: "absolute",
         top: 0,
         left: 0,
-        backgroundColor: "#00FF00",
+        padding: `0 48px ${bottomPadding}px`,
+        boxSizing: "border-box",
+        backgroundColor: "transparent",
       }}
     >
       {activeGroup && <CaptionBox group={activeGroup} frame={frame} />}

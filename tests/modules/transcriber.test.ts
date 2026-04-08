@@ -35,7 +35,7 @@ describe("Transcriber", () => {
   test("fromYouTube fetches transcript for known video", async () => {
     const transcriber = new Transcriber();
     const config = {
-      geminiApiKey: "",
+      openaiApiKey: "",
       whisperModel: "base" as const,
       maxParallelClips: 3,
       silenceThresholdDb: -35,
@@ -64,6 +64,8 @@ describe("Transcriber", () => {
           duration: 212,
           uploadDate: "2009-10-25",
           filePath: "/tmp/fake.mp4",
+          sourceType: "youtube" as const,
+          sourceRef: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
         },
         TMP,
         config,
